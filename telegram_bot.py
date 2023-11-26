@@ -3,6 +3,7 @@ import re
 import urllib
 from typing import Union, TypedDict
 import requests 
+import json
 from telegram import __version__ as TG_VER
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -14,6 +15,8 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler
 )
+from bap_actions import searchBAP
+
 
 """
 Commands to use in the bot
@@ -21,8 +24,8 @@ start - Start the bot
 set_language - To choose language of your choice
 """
 
-uuid_number = "DOC UUID"
-bot = Bot(token="bot token")
+uuid_number = "46715a86-0a95-11ee-910e-912a90a99823"
+bot = Bot(token="6567325826:AAGKVgUk8o424z4IMnitfwLTbqbKtNN_Qjo")
 
 try:
     from telegram import __version_info__
@@ -99,6 +102,7 @@ async def preferred_language_callback(update: Update, context: CallbackContext):
     await bot.send_message(chat_id=update.effective_chat.id, text=text_message)
 
 
+
 async def get_query_response(query: str, voice_message_url: str, voice_message_language: str) -> Union[ApiResponse, ApiError]:
     try:
         if voice_message_url is None:
@@ -165,6 +169,17 @@ async def query_handler(update: Update, context: CallbackContext):
     keywords = ["odr", "dispute"]
     if query and any(keyword in query.lower() for keyword in keywords):
         text_message = "Connecting you to ODR providers."
+
+        dispute_categories = ["commercial-dispute", "e-commerce-dispute", "consumer-dispute", 
+                              "family-dispute", "civil-dispute", "financial-dispute", "employment-dispute"]
+        buttons_per_row = 2
+        dispute_buttons = [InlineKeyboardButton(category.capitalize(), callback_data=f'search_{category}') for category in dispute_categories]
+        
+        dispute_button_rows = [dispute_buttons[i:i + buttons_per_row] for i in range(0, len(dispute_buttons), buttons_per_row)]
+        dispute_reply_markup = InlineKeyboardMarkup(dispute_button_rows)
+
+        await bot.send_message(chat_id=update.effective_chat.id, text="Choose a Dispute Category:", reply_markup=dispute_reply_markup)
+
     
     else:
         if voice_message_language == "English":
@@ -174,16 +189,70 @@ async def query_handler(update: Update, context: CallbackContext):
         elif voice_message_language == "Kannada":
             text_message = "ಧನ್ಯವಾದ. ನಾನು ಉತ್ತಮ ಮಾಹಿತಿಯನ್ನು ಕಂಡುಕೊಳ್ಳುವವರೆಗೆ ದಯವಿಟ್ಟು ನಿರೀಕ್ಷಿಸಿ"
 
-    await bot.send_message(chat_id=update.effective_chat.id, text=text_message)
-
-    if "Connecting you to ODR providers" in text_message:
-        await connect_to_odr_providers(update , query)
-    else:
+        await bot.send_message(chat_id=update.effective_chat.id, text=text_message)
         await handle_query_response(update, query, voice_message_url, voice_message_language)
 
-async def connect_to_odr_providers(update: Update, query: str):
-    await bot.send_message(chat_id=update.effective_chat.id,
-                               text='Searching for odr providers.')
+async def button_callback(update: Update, context: CallbackContext):
+    callback_query = update.callback_query
+    button_data = callback_query.data
+    
+    if button_data.startswith('select_provider_'):
+        # Extract provider ID from the button data
+        provider_id = button_data[len('select_provider_'):]
+        selected_provider_info = get_provider_info(provider_id)
+        await select_provider(update, selected_provider_info)
+    else:
+    
+        if button_data.startswith('search_'):
+            # Extract category from the button data
+            category = button_data[len('search_'):]
+            await connect_to_odr_providers(update, category)
+        else:
+            preferred_language = button_data.lstrip('lang_')
+            context.user_data['language'] = preferred_language
+            text_message = f"You have chosen {preferred_language}. \nPlease give your query now"
+            await bot.send_message(chat_id=update.effective_chat.id, text=text_message)
+
+
+# remove
+
+async def select_provider(update: Update, provider_info: dict):
+    # Implement your logic to handle the selected provider information
+    provider_name = provider_info.get('name')
+    provider_description = provider_info.get('description')
+    
+    response_message = f"Selected Provider:\nName: {provider_name}\nDescription: {provider_description}"
+    
+    await bot.send_message(chat_id=update.effective_chat.id, text=response_message)
+
+def get_provider_info(provider_id: str) -> dict:
+    # Implement your logic to retrieve provider information based on the provider ID
+    # You can use the provider_id to fetch additional details about the provider
+    # For now, let's assume a sample provider_info dictionary
+    sample_provider_info = {
+        'name': 'Sample Provider',
+        'description': 'This is a sample provider description.'
+    }
+    return sample_provider_info
+
+
+# 
+
+async def connect_to_odr_providers(update: Update, category: str):
+    await bot.send_message(chat_id=update.effective_chat.id,text="Searching for ODR providers")
+
+    providers_data = searchBAP(category)
+
+    if not providers_data:
+        await bot.send_message(chat_id=update.effective_chat.id, text="No providers found for the selected category.")
+        return
+
+    buttons = [InlineKeyboardButton(provider_name, callback_data=f'select_provider_{provider_id}') for provider_id, provider_name in providers_data.items()]
+    reply_markup = InlineKeyboardMarkup([buttons])
+
+    await bot.send_message(chat_id=update.effective_chat.id, text="Choose a Provider:", reply_markup=reply_markup)
+
+
 
 async def handle_query_response(update: Update, query: str, voice_message_url: str, voice_message_language: str):
     response = await get_query_response(query, voice_message_url, voice_message_language)
@@ -211,12 +280,14 @@ def main() -> None:
 
     application.add_handler(CommandHandler('set_language', language_handler))
 
+    # Modify the handlers
+    application.add_handler(CallbackQueryHandler(button_callback))
+
     application.add_handler(CallbackQueryHandler(preferred_language_callback, pattern=r'lang_\w*'))
 
     application.add_handler(MessageHandler(filters.TEXT | filters.VOICE, response_handler))
 
     application.run_polling()
-
 
 if __name__ == "__main__":
     main()

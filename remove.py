@@ -9,7 +9,7 @@ for path, path_data in paths.items():
     for method, method_data in path_data.items():
         
         tags = method_data.get("tags", [])
-        if "Beckn Application Platform (BAP)" not in tags:
+        if "Beckn Application Platform (BAP)" in tags:
             print(path)
             exclude.append(path)
         else:
@@ -22,5 +22,5 @@ data["paths"] = paths
 
 updated_yaml = yaml.dump(data, default_flow_style=False, sort_keys=False)
 
-with open("odr_bap.yaml", "w") as file:
+with open("odr_bap_client.yaml", "w") as file:
     file.write(updated_yaml)
