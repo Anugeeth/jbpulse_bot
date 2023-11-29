@@ -59,12 +59,14 @@ class ODRApiClient:
                     },
                     "item": {
                         "descriptor": {
-                            "name": {"code": category} if category else None
-                    }},
+                            "code": category} if category else None
+                    },
                     "provider": { "id": provider_id } if provider_id else None
                 }
             }
         }
+
+        print(payload)
 
         return self._make_request(endpoint, payload)
 
@@ -72,7 +74,8 @@ class ODRApiClient:
         endpoint = "select"
         transaction_id=""
 
-        last_search_transaction = get_user_state(user_id)
+
+        last_search_transaction = get_user_state(self.db, user_id)
 
 
         if last_search_transaction is None:

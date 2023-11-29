@@ -9,6 +9,10 @@ def create_transaction_record(db, user_id, state,category):
     record = {
         "user_id": user_id,
         "transaction_id": transaction_id,
+        "bap_id": "bap_id",
+        "bpp_uri": "bpp_uri",
+        "provider_id": "provider_id",
+        "item_id": "item_id",
         "state": state,
         "timestamp": timestamp,
         "category": category

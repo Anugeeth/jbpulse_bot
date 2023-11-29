@@ -1,11 +1,10 @@
-import logging
-import re
-import urllib
-from typing import Union, TypedDict
-import requests 
 import json
-from telegram import __version__ as TG_VER
+import logging
+
+import redis
+import requests
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import __version__ as TG_VER
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -15,13 +14,19 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler
 )
+
 from jb import get_query_response
 from odr_service.main import init
 
 odr_client = init()
 
-
 bot = Bot(token="6476677118:AAF1SLFv_M1JEh5QhfKcst2M2Ol911Vf5vU")
+
+# Connect to Redis
+redis_host = 'localhost'  # Change this to your Redis server host
+redis_port = 6379  # Change this to your Redis server port
+redis_db = 0  # Change this to your desired Redis database
+redis_client = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db)
 
 try:
     from telegram import __version_info__
@@ -40,7 +45,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -89,7 +93,6 @@ async def preferred_language_callback(update: Update, context: CallbackContext):
     await bot.send_message(chat_id=update.effective_chat.id, text=text_message)
 
 
-
 async def response_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await query_handler(update, context)
 
@@ -115,17 +118,20 @@ async def query_handler(update: Update, context: CallbackContext):
     if query and any(keyword in query.lower() for keyword in keywords):
         text_message = "Connecting you to ODR providers."
 
-        dispute_categories = ["commercial-dispute", "e-commerce-dispute", "consumer-dispute", 
+        dispute_categories = ["commercial-dispute", "e-commerce-dispute", "consumer-dispute",
                               "family-dispute", "civil-dispute", "financial-dispute", "employment-dispute"]
         buttons_per_row = 2
-        dispute_buttons = [InlineKeyboardButton(category, callback_data=f'search_{category}') for category in dispute_categories]
-        
-        dispute_button_rows = [dispute_buttons[i:i + buttons_per_row] for i in range(0, len(dispute_buttons), buttons_per_row)]
+        dispute_buttons = [InlineKeyboardButton(category, callback_data=f'search_{category}') for category in
+                           dispute_categories]
+
+        dispute_button_rows = [dispute_buttons[i:i + buttons_per_row] for i in
+                               range(0, len(dispute_buttons), buttons_per_row)]
         dispute_reply_markup = InlineKeyboardMarkup(dispute_button_rows)
 
-        await bot.send_message(chat_id=update.effective_chat.id, text="Choose a Dispute Category:", reply_markup=dispute_reply_markup)
+        await bot.send_message(chat_id=update.effective_chat.id, text="Choose a Dispute Category:",
+                               reply_markup=dispute_reply_markup)
 
-    
+
     else:
         if voice_message_language == "English":
             text_message = "Thank you, allow me to search for the best information to respond to your query."
@@ -137,16 +143,23 @@ async def query_handler(update: Update, context: CallbackContext):
         await bot.send_message(chat_id=update.effective_chat.id, text=text_message)
         await handle_query_response(update, query, voice_message_url, voice_message_language)
 
+
 async def button_callback(update: Update, context: CallbackContext):
     callback_query = update.callback_query
     button_data = callback_query.data
-    
+    print(button_data)
+
     if button_data.startswith('select_provider_'):
         provider_id = button_data[len('select_provider_'):]
-        bpp_details = odr_client.search_bpp(context._user_id, provider_id= provider_id,category= "civil-dispute" )
+        provider_info = redis_client.get(provider_id)
+        provider_info = json.loads(provider_info)
+        print(provider_info)
+        await select_provider(update, provider_info, context)
+        # bpp_details = odr_client.search_bpp(context._user_id, provider_id=provider_id, category="civil-dispute")
         # await select_provider(update, provider_id)
+        pass
     else:
-    
+
         if button_data.startswith('search_'):
             category = button_data[len('search_'):]
             await connect_to_odr_providers(update, context, category)
@@ -159,33 +172,45 @@ async def button_callback(update: Update, context: CallbackContext):
 
 # remove
 
-async def select_provider(update: Update, provider_info: dict):
-    provider_details = odr_client.select_provider_and_item(provider_info.provider_id, provider_info.item_id, provider_info.bpp_id , provider_info.bpp_url)
-    provider_info = provider_details.data["data"][0]["message"]["order"]["provider"]["descriptor"]
+async def select_provider(update: Update, provider_info: dict, context):
+    provider_details = odr_client.select_provider_and_item(context._user_id, provider_info["provider_id"], provider_info["item_id"],
+                                                           provider_info["bpp_id"], provider_info["bpp_uri"])
+
+    print(json.dumps(provider_details["data"], indent=4))
+
+    order = None
+
+    for provider in provider_details["data"]:
+        if provider["message"]["order"]["provider"]["id"] == provider_info["provider_id"]:
+            order = provider["message"]["order"]
+            break
+
+
+    provider_info = order["provider"]["descriptor"]
 
     provider_name = provider_info["name"]
     provider_short_desc = provider_info["short_desc"]
     provider_long_desc = provider_info["long_desc"]
     provider_additional_desc_url = provider_info["additional_desc"]["url"]
 
-    price_info = provider_details.data["data"][0]["message"]["order"]["quote"]["price"]
+    price_info = order["quote"]["price"]
     currency = price_info["currency"]
     price_value = price_info["value"]
 
-    breakup_info = provider_details.data["data"][0]["message"]["order"]["quote"]["breakup"]
+    breakup_info = order["quote"]["breakup"]
     breakup_details = [{"title": item["title"], "price": item["price"]["value"]} for item in breakup_info]
 
     response_message = f"Selected Provider:\nName: {provider_name}\nDescription: {provider_long_desc}\n Price: {price_value}"
-    
+
     await bot.send_message(chat_id=update.effective_chat.id, text=response_message)
 
 
 # 
 
-async def connect_to_odr_providers(update: Update, context : CallbackContext ,category: str ):
-    await bot.send_message(chat_id=update.effective_chat.id,text="Searching for ODR providers")
+async def connect_to_odr_providers(update: Update, context: CallbackContext, category: str):
+    await bot.send_message(chat_id=update.effective_chat.id, text="Searching for ODR providers")
 
-    providers_data = odr_client.search_bpp( context._user_id,category=category )
+    providers_data = odr_client.search_bpp(context._user_id, category=category)
 
     if not providers_data:
         await bot.send_message(chat_id=update.effective_chat.id, text="No providers found for the selected category.")
@@ -193,12 +218,32 @@ async def connect_to_odr_providers(update: Update, context : CallbackContext ,ca
 
     # print(json.dumps(providers_data, indent=4))
 
+    providers_list = []
 
-    buttons = [InlineKeyboardButton(provider["descriptor"]["name"], callback_data=f'select_provider_{provider["id"]}') for provider in providers_data["data"][0]["message"]["provider"]]
+    for providers in providers_data["data"]:
+        for provider in providers["message"]["provider"]:
+            item_id = ""
+            for item in provider["items"]:
+                if item["descriptor"]["code"] == "arbitration-service":
+                    item_id = item["id"]
+                    break
+
+            providers_list.append(
+                    {"name": provider["descriptor"]["name"], "provider_id": provider["id"], "item_id": item_id,
+                     "bpp_id": providers["context"]["bpp_id"],
+                     "bpp_uri": providers["context"]["bpp_uri"]})
+
+    for provider in providers_list:
+        print(provider)
+        redis_client.set(f'{context._user_id}_{provider["provider_id"]}', json.dumps(provider))
+
+    buttons = [InlineKeyboardButton(text=provider["name"],
+                                    callback_data=f'select_provider_{context._user_id}_{provider["provider_id"]}') for
+               provider in providers_list]
+
     reply_markup = InlineKeyboardMarkup([buttons])
 
     await bot.send_message(chat_id=update.effective_chat.id, text="Choose a Provider:", reply_markup=reply_markup)
-
 
 
 async def handle_query_response(update: Update, query: str, voice_message_url: str, voice_message_language: str):
@@ -235,6 +280,7 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.TEXT | filters.VOICE, response_handler))
 
     application.run_polling()
+
 
 if __name__ == "__main__":
     main()
