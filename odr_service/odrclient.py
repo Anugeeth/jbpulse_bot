@@ -1,6 +1,7 @@
 import requests
 import json
 import uuid
+from datetime import datetime
 from odr_service.services.users import *
 from odr_service.services.transactions import *
 
@@ -10,6 +11,24 @@ class ODRApiClient:
         self.bap_id = bap_id
         self.domain = domain
         self.db = db
+
+    def _make_context(self, action ,transaction_id, bpp_id = None, bpp_uri = None):
+        return {
+                "domain": self.domain,
+                "location": {
+                    "country": {"code": "IND"}
+                },
+                "transaction_id": transaction_id,
+                "message_id": "",
+                "action": action,
+                "timestamp": datetime.now(),
+                "version": "1.1.0",
+                "bap_uri": self.bap_uri,
+                "bap_id": self.bap_id,
+                "bpp_id": bpp_id if bpp_id else None,
+                "bpp_url": bpp_uri if bpp_uri else None,
+                "ttl": "PT10M"
+        }
 
     def _make_request(self, endpoint, payload):
         url = f"{self.bap_uri}/{endpoint}"
@@ -28,7 +47,6 @@ class ODRApiClient:
         endpoint = "search"
         transaction_id = ""
 
-
         existing_transaction = get_user_state(self.db ,user_id)
 
         if existing_transaction is None:
@@ -38,20 +56,7 @@ class ODRApiClient:
 
 
         payload = {
-            "context": {
-                "domain": self.domain,
-                "location": {
-                    "country": {"code": "IND"}
-                },
-                "transaction_id": transaction_id,
-                "message_id": "",
-                "action": "search",
-                "timestamp": "2023-05-25T05:23:03.443Z",
-                "version": "1.1.0",
-                "bap_uri": self.bap_uri,
-                "bap_id": self.bap_id,
-                "ttl": "PT10M"
-            },
+            "context": self._make_context(action = endpoint , transaction_id= transaction_id),
             "message": {
                 "intent": {
                     "category": {
@@ -59,7 +64,7 @@ class ODRApiClient:
                     },
                     "item": {
                         "descriptor": {
-                            "name": {"code": category} if category else None
+                            "code": category if category else None
                     }},
                     "provider": { "id": provider_id } if provider_id else None
                 }
@@ -68,7 +73,7 @@ class ODRApiClient:
 
         return self._make_request(endpoint, payload)
 
-    def select_provider_and_item(self, user_id, provider_id, item_id, bpp_id , bpp_url):
+    def select_provider_and_item(self, user_id, provider_id, item_id, bpp_id , bpp_uri):
         endpoint = "select"
         transaction_id=""
 
@@ -85,22 +90,7 @@ class ODRApiClient:
 
 
         payload = {
-            "context": {
-                "domain": self.domain,
-                "location": {
-                    "country": {"code": "IND"}
-                },
-                "transaction_id": transaction_id,
-                "message_id": "",
-                "action": "select",
-                "timestamp": "2023-05-25T05:23:03.443Z",
-                "version": "1.1.0",
-                "bap_uri": self.bap_uri,
-                "bap_id": self.bap_id,
-                "bpp_id": bpp_id,
-                "bpp_url": bpp_url,
-                "ttl": "PT10M"
-            },
+            "context": self._make_context(action = endpoint , transaction_id = transaction_id , bpp_id=bpp_id , bpp_uri= bpp_uri),
             "message": {
                 "order": {
                     "provider": {"id": provider_id},
@@ -111,28 +101,12 @@ class ODRApiClient:
 
         return self._make_request(endpoint, payload)
 
-    def init_order(self, provider_id, item_id, customer_details, bpp_id, bpp_url):
+    def init_order(self, provider_id, item_id, customer_details, bpp_id, bpp_uri):
         endpoint = "init"
         transaction_id = str(uuid.uuid4())
-        message_id = str(uuid.uuid4())
 
         payload = {
-            "context": {
-                "domain": self.domain,
-                "location": {
-                    "country": {"code": "IND"}
-                },
-                "transaction_id": transaction_id,
-                "message_id": "",
-                "action": "init",
-                "timestamp": "2023-05-25T05:23:03.443Z",
-                "version": "1.1.0",
-                "bap_uri": self.bap_uri,
-                "bap_id": self.bap_id,
-                "bpp_id": bpp_id,
-                "bpp_url": bpp_url,
-                "ttl": "PT10M"
-            },
+            "context": self._make_context(action = endpoint , transaction_id = transaction_id , bpp_id=bpp_id , bpp_uri= bpp_uri),
             "message": {
                 "order": {
                     "provider": {"id": provider_id},
@@ -175,7 +149,7 @@ class ODRApiClient:
 
         return self._make_request(endpoint, payload)
 
-    def confirm_order(self, user_id, provider_id, item_id, customer_details, submission_id, bpp_id, bpp_url):
+    def confirm_order(self, user_id, provider_id, item_id, customer_details, submission_id, bpp_id, bpp_uri):
         endpoint = "confirm"
 
         existing_transaction = get_user_state(self.db, user_id)
@@ -186,22 +160,7 @@ class ODRApiClient:
         transaction_id = existing_transaction["transaction_id"]
 
         payload = {
-            "context": {
-                "domain": self.domain,
-                "location": {
-                    "country": {"code": "IND"}
-                },
-                "transaction_id": transaction_id,
-                "message_id": "",
-                "action": "confirm",
-                "timestamp": "2023-05-25T05:23:03.443Z",
-                "version": "1.1.0",
-                "bap_uri": self.bap_uri,
-                "bap_id": self.bap_id,
-                "bpp_id": bpp_id,
-                "bpp_url": bpp_url,
-                "ttl": "PT10M"
-            },
+            "context": self._make_context(action = endpoint , transaction_id = transaction_id , bpp_id=bpp_id , bpp_uri= bpp_uri),
             "message": {
                 "order": {
                     "provider": {"id": provider_id},
@@ -247,5 +206,4 @@ class ODRApiClient:
         }
 
         update_user_state(self.db, user_id, transaction_id, "CONFIRM")
-
         return self._make_request(endpoint, payload)
