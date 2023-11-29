@@ -15,16 +15,12 @@ from telegram.ext import (
     CallbackContext,
     CallbackQueryHandler
 )
-from bap_actions import searchBAP
+from jb import get_query_response
+from odr_service.main import init
+
+odr_client = init()
 
 
-"""
-Commands to use in the bot
-start - Start the bot
-set_language - To choose language of your choice
-"""
-
-uuid_number = "46715a86-0a95-11ee-910e-912a90a99823"
 bot = Bot(token="6567325826:AAGKVgUk8o424z4IMnitfwLTbqbKtNN_Qjo")
 
 try:
@@ -45,15 +41,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
-class ApiResponse(TypedDict):
-    query: str
-    answer: str
-    source_text: str
-
-
-class ApiError(TypedDict):
-    error: Union[str, requests.exceptions.RequestException]
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -103,48 +90,6 @@ async def preferred_language_callback(update: Update, context: CallbackContext):
 
 
 
-async def get_query_response(query: str, voice_message_url: str, voice_message_language: str) -> Union[ApiResponse, ApiError]:
-    try:
-        if voice_message_url is None:
-            if voice_message_language == "English":
-                query_engine_route = 'query-with-langchain-gpt4'
-                params = {
-                    'uuid_number': uuid_number,
-                    'query_string': query,
-                }
-
-                url = f'https://api.jugalbandi.ai/{query_engine_route}?' \
-                      + urllib.parse.urlencode(params)
-            else:
-                params = {
-                    'uuid_number': uuid_number,
-                    'query_text': query,
-                    'audio_url': "",
-                    'input_language': voice_message_language,
-                    'output_format': 'Text',
-                }
-                url = 'https://api.jugalbandi.ai/query-using-voice-gpt4?' \
-                      + urllib.parse.urlencode(params)
-        else:
-            params = {
-                'uuid_number': uuid_number,
-                'audio_url': voice_message_url,
-                'input_language': voice_message_language,
-                'output_format': 'Voice',
-            }
-            url = 'https://api.jugalbandi.ai/query-using-voice-gpt4?' \
-                  + urllib.parse.urlencode(params)
-
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        return data
-    except requests.exceptions.RequestException as e:
-        return {'error': e}
-    except (KeyError, ValueError):
-        return {'error': 'Invalid response received from API'}
-
-
 async def response_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await query_handler(update, context)
 
@@ -173,7 +118,7 @@ async def query_handler(update: Update, context: CallbackContext):
         dispute_categories = ["commercial-dispute", "e-commerce-dispute", "consumer-dispute", 
                               "family-dispute", "civil-dispute", "financial-dispute", "employment-dispute"]
         buttons_per_row = 2
-        dispute_buttons = [InlineKeyboardButton(category.capitalize(), callback_data=f'search_{category}') for category in dispute_categories]
+        dispute_buttons = [InlineKeyboardButton(category, callback_data=f'search_{category}') for category in dispute_categories]
         
         dispute_button_rows = [dispute_buttons[i:i + buttons_per_row] for i in range(0, len(dispute_buttons), buttons_per_row)]
         dispute_reply_markup = InlineKeyboardMarkup(dispute_button_rows)
@@ -197,16 +142,15 @@ async def button_callback(update: Update, context: CallbackContext):
     button_data = callback_query.data
     
     if button_data.startswith('select_provider_'):
-        # Extract provider ID from the button data
         provider_id = button_data[len('select_provider_'):]
-        selected_provider_info = get_provider_info(provider_id)
-        await select_provider(update, selected_provider_info)
+        bpp_details = odr_client.search_bpp(context._user_id, provider_id= provider_id,category= "civil-dispute" )
+        print("bpp",bpp_details)
+        # await select_provider(update, provider_id)
     else:
     
         if button_data.startswith('search_'):
-            # Extract category from the button data
             category = button_data[len('search_'):]
-            await connect_to_odr_providers(update, category)
+            await connect_to_odr_providers(update, context, category)
         else:
             preferred_language = button_data.lstrip('lang_')
             context.user_data['language'] = preferred_language
@@ -217,31 +161,32 @@ async def button_callback(update: Update, context: CallbackContext):
 # remove
 
 async def select_provider(update: Update, provider_info: dict):
-    # Implement your logic to handle the selected provider information
-    provider_name = provider_info.get('name')
-    provider_description = provider_info.get('description')
-    
-    response_message = f"Selected Provider:\nName: {provider_name}\nDescription: {provider_description}"
+    provider_details = odr_client.select_provider_and_item(provider_info.provider_id, provider_info.item_id, provider_info.bpp_id , provider_info.bpp_url)
+
+    provider_info = provider_details.data["data"][0]["message"]["order"]["provider"]["descriptor"]
+    provider_name = provider_info["name"]
+    provider_short_desc = provider_info["short_desc"]
+    provider_long_desc = provider_info["long_desc"]
+    provider_additional_desc_url = provider_info["additional_desc"]["url"]
+
+    price_info = provider_details.data["data"][0]["message"]["order"]["quote"]["price"]
+    currency = price_info["currency"]
+    price_value = price_info["value"]
+
+    breakup_info = provider_details.data["data"][0]["message"]["order"]["quote"]["breakup"]
+    breakup_details = [{"title": item["title"], "price": item["price"]["value"]} for item in breakup_info]
+
+    response_message = f"Selected Provider:\nName: {provider_name}\nDescription: {provider_long_desc}\n Price: {price_value}"
     
     await bot.send_message(chat_id=update.effective_chat.id, text=response_message)
-
-def get_provider_info(provider_id: str) -> dict:
-    # Implement your logic to retrieve provider information based on the provider ID
-    # You can use the provider_id to fetch additional details about the provider
-    # For now, let's assume a sample provider_info dictionary
-    sample_provider_info = {
-        'name': 'Sample Provider',
-        'description': 'This is a sample provider description.'
-    }
-    return sample_provider_info
 
 
 # 
 
-async def connect_to_odr_providers(update: Update, category: str):
+async def connect_to_odr_providers(update: Update, context : CallbackContext ,category: str ):
     await bot.send_message(chat_id=update.effective_chat.id,text="Searching for ODR providers")
 
-    providers_data = searchBAP(category)
+    providers_data = odr_client.search_bpp( context._user_id,category=category )
 
     if not providers_data:
         await bot.send_message(chat_id=update.effective_chat.id, text="No providers found for the selected category.")

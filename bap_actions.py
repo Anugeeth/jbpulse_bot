@@ -1,12 +1,16 @@
 import requests 
 import json
+import uuid
+
+
+domain = "online-dispute-resolution:0.1.0"
+bap_uri = "https://odr-prod-bap.onrender.com"
+bap_id = "ODR-BAP-LITE"
+
 
 def searchBAP(code) : 
-    domain = "online-dispute-resolution:0.1.0"
-    bap_uri = "https://odr-prod-bap.onrender.com"
-    bap_id = "ODR-BAP-LITE"
-
     url = "https://odr-prod-bap.onrender.com/search"
+
 
     payload = {
         "context": {
@@ -66,4 +70,57 @@ def searchBAP(code) :
     return providers_data
 
 
+def get_price_and_breakup(provider_id, item_id):
+    url = "https://odr-prod-bap.onrender.com/select"
+
+    # Replace these placeholders with actual values
+    domain = "online-dispute-resolution:0.1.0"
+    bap_uri = "your_bap_uri"
+    bap_id = "your_bap_id"
+    bpp_id = "your_bpp_id"
+    bpp_uri = "your_bpp_uri"
+
+    transaction_id = str(uuid.uuid4())
+    message_id = str(uuid.uuid4())
+
+    payload = {
+        "context": {
+            "domain": domain,
+            "location": {
+                "country": {
+                    "code": "IND"
+                }
+            },
+            "transaction_id": transaction_id,
+            "message_id": message_id,
+            "action": "select",
+            "timestamp": "2023-05-25T05:23:03.443Z",
+            "version": "1.1.0",
+            "bap_uri": bap_uri,
+            "bap_id": bap_id,
+            "bpp_id": bpp_id,
+            "bpp_uri": bpp_uri,
+            "ttl": "PT10M"
+        },
+        "message": {
+            "order": {
+                "provider": {
+                    "id": provider_id
+                },
+                "items": [
+                    {
+                        "id": item_id
+                    }
+                ]
+            }
+        }
+    }
+
+    headers = {'Content-Type': 'application/json'}
+    response = requests.post(url, data=json.dumps(payload), headers=headers)
+
+    if response.status_code == 200:
+        return json.loads(response.text)
+    else:
+        return {"error": f"Error {response.status_code}: {response.text}"}
 
