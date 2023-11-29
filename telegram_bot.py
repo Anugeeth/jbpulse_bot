@@ -21,7 +21,7 @@ from odr_service.main import init
 odr_client = init()
 
 
-bot = Bot(token="6567325826:AAGKVgUk8o424z4IMnitfwLTbqbKtNN_Qjo")
+bot = Bot(token="6476677118:AAF1SLFv_M1JEh5QhfKcst2M2Ol911Vf5vU")
 
 try:
     from telegram import __version_info__
@@ -144,7 +144,6 @@ async def button_callback(update: Update, context: CallbackContext):
     if button_data.startswith('select_provider_'):
         provider_id = button_data[len('select_provider_'):]
         bpp_details = odr_client.search_bpp(context._user_id, provider_id= provider_id,category= "civil-dispute" )
-        print("bpp",bpp_details)
         # await select_provider(update, provider_id)
     else:
     
@@ -162,8 +161,8 @@ async def button_callback(update: Update, context: CallbackContext):
 
 async def select_provider(update: Update, provider_info: dict):
     provider_details = odr_client.select_provider_and_item(provider_info.provider_id, provider_info.item_id, provider_info.bpp_id , provider_info.bpp_url)
-
     provider_info = provider_details.data["data"][0]["message"]["order"]["provider"]["descriptor"]
+
     provider_name = provider_info["name"]
     provider_short_desc = provider_info["short_desc"]
     provider_long_desc = provider_info["long_desc"]
@@ -192,7 +191,10 @@ async def connect_to_odr_providers(update: Update, context : CallbackContext ,ca
         await bot.send_message(chat_id=update.effective_chat.id, text="No providers found for the selected category.")
         return
 
-    buttons = [InlineKeyboardButton(provider_name, callback_data=f'select_provider_{provider_id}') for provider_id, provider_name in providers_data.items()]
+    # print(json.dumps(providers_data, indent=4))
+
+
+    buttons = [InlineKeyboardButton(provider["descriptor"]["name"], callback_data=f'select_provider_{provider["id"]}') for provider in providers_data["data"][0]["message"]["provider"]]
     reply_markup = InlineKeyboardMarkup([buttons])
 
     await bot.send_message(chat_id=update.effective_chat.id, text="Choose a Provider:", reply_markup=reply_markup)

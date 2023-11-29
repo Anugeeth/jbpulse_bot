@@ -30,11 +30,11 @@ class ODRApiClient:
 
 
         existing_transaction = get_user_state(self.db ,user_id)
-        
-        if existing_transaction["state"] == "SEARCH":
-            transaction_id = existing_transaction["transaction_id"]
-        else:
+
+        if existing_transaction is None:
             create_transaction_record(self.db ,user_id, "SEARCH", category )
+        elif existing_transaction["state"] == "SEARCH":
+            transaction_id = existing_transaction["transaction_id"]
 
 
         payload = {
@@ -74,12 +74,15 @@ class ODRApiClient:
 
         last_search_transaction = get_user_state(user_id)
 
+
+        if last_search_transaction is None:
+            return {"error": "No search transaction found"}
+
+
         if last_search_transaction["state"] == "SEARCH":
             transaction_id = last_search_transaction["transaction_id"]
             update_user_state(self.db ,user_id, transaction_id, "SELECT")
 
-        else:
-            return {"error" : "No search transaction found"}
 
         payload = {
             "context": {
