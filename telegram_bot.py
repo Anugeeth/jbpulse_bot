@@ -13,13 +13,15 @@ from telegram.ext import (
     MessageHandler,
     filters,
     CallbackContext,
-    CallbackQueryHandler
+    CallbackQueryHandler,
+    ConversationHandler
 )
 from jb import get_query_response
 from odr_service.main import init
 
 odr_client = init()
 
+USER_INFO = range(1)
 
 bot = Bot(token="6567325826:AAGKVgUk8o424z4IMnitfwLTbqbKtNN_Qjo")
 
@@ -44,7 +46,6 @@ logger = logging.getLogger(__name__)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /start is issued."""
     user_name = update.message.chat.first_name
     welcome_message = (
         f"Hi {user_name}, Welcome to the <CUSTOM_NAME> bot, "
@@ -180,8 +181,6 @@ async def select_provider(update: Update, provider_info: dict):
     await bot.send_message(chat_id=update.effective_chat.id, text=response_message)
 
 
-# 
-
 async def connect_to_odr_providers(update: Update, context : CallbackContext ,category: str ):
     await bot.send_message(chat_id=update.effective_chat.id,text="Searching for ODR providers")
 
@@ -219,6 +218,34 @@ async def handle_query_response(update: Update, query: str, voice_message_url: s
                                      voice=audio_data)
 
 
+async def initialize_order(update, context):
+    context.user_data['user_id'] = update.message.from_user.id
+    await update.message.reply_text("What's your full name?")
+
+    return USER_INFO
+
+async def user_details_conv(update, context):
+    info_fields = ["name", "email", "phone", "address", "city"]
+    current_field = context.user_data.get("current_field", 0)
+
+    if current_field < len(info_fields):
+        context.user_data[info_fields[current_field]] = update.message.text
+        current_field += 1
+        context.user_data["current_field"] = current_field
+
+        if current_field < len(info_fields):
+            await update.message.reply_text(f"What's your {info_fields[current_field]}?")
+        else:
+            # store
+            
+            context.user_data.clear()
+            await update.message.reply_text("Done!")
+            return ConversationHandler.END
+
+    return USER_INFO
+
+
+
 def main() -> None:
     application = ApplicationBuilder().bot(bot).build()
 
@@ -226,10 +253,26 @@ def main() -> None:
 
     application.add_handler(CommandHandler('set_language', language_handler))
 
+# remove handler when init is done
+    application.add_handler(CommandHandler("conv", initialize_order))
+
+    conversation_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.TEXT, initialize_order)],
+        states={
+            USER_INFO: [MessageHandler(filters.TEXT, user_details_conv)],
+        },
+        fallbacks=[],
+    )
+
+
     # Modify the handlers
     application.add_handler(CallbackQueryHandler(button_callback))
 
     application.add_handler(CallbackQueryHandler(preferred_language_callback, pattern=r'lang_\w*'))
+
+
+    application.add_handler(conversation_handler)
+
 
     application.add_handler(MessageHandler(filters.TEXT | filters.VOICE, response_handler))
 
