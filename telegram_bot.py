@@ -21,7 +21,7 @@ from odr_service.main import init
 odr_client = init()
 
 
-bot = Bot(token="6476677118:AAF1SLFv_M1JEh5QhfKcst2M2Ol911Vf5vU")
+bot = Bot(token="6567325826:AAGKVgUk8o424z4IMnitfwLTbqbKtNN_Qjo")
 
 try:
     from telegram import __version_info__
@@ -192,7 +192,6 @@ async def connect_to_odr_providers(update: Update, context : CallbackContext ,ca
         return
 
     # print(json.dumps(providers_data, indent=4))
-
 
     buttons = [InlineKeyboardButton(provider["descriptor"]["name"], callback_data=f'select_provider_{provider["id"]}') for provider in providers_data["data"][0]["message"]["provider"]]
     reply_markup = InlineKeyboardMarkup([buttons])

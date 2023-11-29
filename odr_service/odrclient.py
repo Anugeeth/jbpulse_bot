@@ -123,7 +123,7 @@ class ODRApiClient:
                     "country": {"code": "IND"}
                 },
                 "transaction_id": transaction_id,
-                "message_id": message_id,
+                "message_id": "",
                 "action": "init",
                 "timestamp": "2023-05-25T05:23:03.443Z",
                 "version": "1.1.0",
@@ -172,5 +172,80 @@ class ODRApiClient:
                 }
             }
         }
+
+        return self._make_request(endpoint, payload)
+
+    def confirm_order(self, user_id, provider_id, item_id, customer_details, submission_id, bpp_id, bpp_url):
+        endpoint = "confirm"
+
+        existing_transaction = get_user_state(self.db, user_id)
+
+        if existing_transaction["state"] == "CONFIRM":
+            return {"error": "User is already in CONFIRM state"}
+
+        transaction_id = existing_transaction["transaction_id"]
+
+        payload = {
+            "context": {
+                "domain": self.domain,
+                "location": {
+                    "country": {"code": "IND"}
+                },
+                "transaction_id": transaction_id,
+                "message_id": "",
+                "action": "confirm",
+                "timestamp": "2023-05-25T05:23:03.443Z",
+                "version": "1.1.0",
+                "bap_uri": self.bap_uri,
+                "bap_id": self.bap_id,
+                "bpp_id": bpp_id,
+                "bpp_url": bpp_url,
+                "ttl": "PT10M"
+            },
+            "message": {
+                "order": {
+                    "provider": {"id": provider_id},
+                    "items": [
+                        {
+                            "id": item_id,
+                            "xinput": {
+                                "form_response": {
+                                    "status": True,
+                                    "submission_id": submission_id
+                                }
+                            }
+                        }
+                    ],
+                    "billing": {
+                        "name": customer_details["name"],
+                        "email": customer_details["email"],
+                        "address": customer_details["address"],
+                        "city": {"name": customer_details["city"]}
+                    },
+                    "fulfillments": [
+                        {
+                            "customer": {
+                                "person": {"name": customer_details["name"]},
+                                "contact": {
+                                    "phone": customer_details["phone"],
+                                    "email": customer_details["email"]
+                                }
+                            }
+                        }
+                    ],
+                    "payments": [
+                        {
+                            "params": {
+                                "amount": "12000",
+                                "currency": "INR"
+                            },
+                            "status": "PAID"
+                        }
+                    ]
+                }
+            }
+        }
+
+        update_user_state(self.db, user_id, transaction_id, "CONFIRM")
 
         return self._make_request(endpoint, payload)
