@@ -1,11 +1,8 @@
 from odr_service.mongodb_client import MongoDBClient
-from odr_service.services.transactions import create_transaction_record, update_transaction_state, get_transaction_details
 from odr_service.odrclient import ODRApiClient
 
 bap_uri = "https://odr-prod-bap.onrender.com"
 bap_id = "ODR-BAP-LITE"
-
-print("init")
 
 
 def init():
