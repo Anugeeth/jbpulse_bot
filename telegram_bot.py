@@ -16,15 +16,16 @@ from telegram.ext import (
     CallbackQueryHandler,
     ConversationHandler
 )
-from handlers import handle_start, language_handler, query_handler, handle_language_change
-from pyfsm import fsm
+from handlers import handle_start, language_handler, query_handler, handle_language_change, handle_search, handle_odr
+import fsm
 
 
 class ChatState(Enum):
     START = auto()
     LANGUAGE = auto()
     QUERY = auto()
-    ODR = auto()
+    SEARCH = auto()
+    SELECT = auto()
 
     def __str__(self):
         return self.name
@@ -34,8 +35,9 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
     state_machine = {
         ChatState.START: (ChatState.LANGUAGE,),
         ChatState.LANGUAGE: '__all__',
-        ChatState.QUERY: (ChatState.ODR, ChatState.LANGUAGE),
-        ChatState.ODR: None
+        ChatState.QUERY: (ChatState.SEARCH, ChatState.LANGUAGE),
+        ChatState.SEARCH: (ChatState.SEARCH),
+        ChatState.SEARCH: None
     }
 
     def __init__(self, update, context):
@@ -80,6 +82,13 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
     async def on_exit_LANGUAGE(self):
         await handle_language_change(self.update, self.context)
 
+    async def on_entry_SEARCH(self):
+        await handle_odr(self.update, self.context)
+
+
+    async def on_exit_SEARCH(self):
+        await handle_search(self.update, self.update)
+
 
 USER_INFO = range(1)
 
@@ -111,11 +120,23 @@ async def response_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     if state == ChatState.START:
         fsm.change_state(ChatState.LANGUAGE)
-    elif state == ChatState.LANGUAGE:
-        await language_handler(update, context)
 
-    if state == ChatState.QUERY:
-        await query_handler(update, context)
+    elif state == ChatState.LANGUAGE: #text message when asked language
+        await fsm.on_entry_LANGUAGE()
+
+    elif state == ChatState.QUERY:
+
+        query = update.message.text
+        keywords = ["odr", "dispute"]
+        if query and any(keyword in query.lower() for keyword in keywords):
+            fsm.change_state(ChatState.SEARCH)
+        else:
+            await query_handler(update, context)
+
+    elif state == ChatState.SEARCH:
+        await fsm.on_entry_SEARCH()
+
+
 
 
 async def button_callback(update: Update, context: CallbackContext):
@@ -131,9 +152,12 @@ async def button_callback(update: Update, context: CallbackContext):
         # bpp_details = odr_client.search_bpp(context._user_id, provider_id=provider_id, category="civil-dispute")
         # await select_provider(update, provider_id)
     elif button_data.startswith('search_'):
-        pass
+        if state == ChatState.SEARCH:
+            await handle_search(update, context)
+        else:
+            fsm.change_state(ChatState.SEARCH)
+
     elif button_data.startswith('lang_'):
-        print()
         if state == ChatState.LANGUAGE:
             if prev_state != ChatState.START:
                 fsm.go_back()
