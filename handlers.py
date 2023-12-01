@@ -118,6 +118,16 @@ async def query_handler(update: Update, context: CallbackContext):
 
 
 
+async def handle_select_provider_start(update: Update, context: CallbackContext):
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Getting provider details")
+
+async def handle_select_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    buttons = [KeyboardButton("yes"), KeyboardButton("no")]
+    button_markup = ReplyKeyboardMarkup([buttons], one_time_keyboard=True , is_persistent=True)
+
+    await context.bot.send_message(chat_id=update.effective_chat.id,
+                           text='Are you sure you want to select this provider?', reply_markup=button_markup)
+
 async def handle_select_provider(update: Update, context: CallbackContext):
     callback_query = update.callback_query
     button_data = callback_query.data
@@ -164,11 +174,11 @@ async def select_provider(update: Update, provider_info: dict, context):
     order = None
 
     for provider in provider_details["data"]:
-        if provider["message"]["order"]["providers"]["id"] == provider_info["provider_id"]:
+        if provider["message"]["order"]["provider"]["id"] == provider_info["provider_id"]:
             order = provider["message"]["order"]
             break
 
-    provider_info = order["providers"]["descriptor"]
+    provider_info = order["provider"]["descriptor"]
 
     provider_name = provider_info["name"]
     provider_short_desc = provider_info["short_desc"]

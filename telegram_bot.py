@@ -15,7 +15,31 @@ from telegram.ext import (
 
 import fsm
 from handlers import handle_start, language_handler, query_handler, handle_language_change, handle_search, handle_odr, \
-    handle_reset
+    handle_reset, handle_select_provider, handle_select_provider_start, handle_select_confirm
+
+
+class OrderDetailsState(Enum):
+    START = auto()
+    NAME = auto()
+    EMAIL = auto()
+    ADDRESS = auto()
+    CITY = auto()
+    PHONE = auto()
+
+    def __str__(self):
+        return self.name
+
+
+class OrderChatFSM(fsm.FiniteStateMachineMixin):
+    state_machine = {
+        OrderDetailsState.START: OrderDetailsState.NAME,
+        OrderDetailsState.NAME: OrderDetailsState.EMAIL,
+        OrderDetailsState.EMAIL: OrderDetailsState.ADDRESS,
+        OrderDetailsState.ADDRESS: OrderDetailsState.CITY,
+        OrderDetailsState.CITY: OrderDetailsState.PHONE,
+        OrderDetailsState.PHONE: None
+    }
+
 
 
 class ChatState(Enum):
@@ -26,6 +50,8 @@ class ChatState(Enum):
     QUERY = auto()
     SEARCH = auto()
     SELECT = auto()
+    SELECT_CONFIRM = auto()
+    INIT = auto()
 
     def __str__(self):
         return self.name
@@ -39,7 +65,9 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
         ChatState.LANGUAGE: '__all__',
         ChatState.QUERY: (ChatState.SEARCH, ChatState.LANGUAGE, ChatState.RESET),
         ChatState.SEARCH: (ChatState.SELECT, ChatState.QUERY, ChatState.LANGUAGE, ChatState.RESET),
-        ChatState.SELECT: None
+        ChatState.SELECT: (ChatState.SELECT_CONFIRM, ChatState.LANGUAGE, ChatState.RESET),
+        ChatState.SELECT_CONFIRM: (ChatState.INIT, ChatState.SEARCH, ChatState.LANGUAGE, ChatState.RESET),
+        ChatState.INIT: None,
     }
 
     def __init__(self, update, context):
@@ -90,7 +118,17 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
 
     async def on_exit_SEARCH(self, next_state):
         if next_state == ChatState.SELECT:
-            await handle_search(self.update, self.update)
+            await handle_search(self.update, self.context)
+
+    async def on_entry_SELECT(self, prev_state):
+        await handle_select_provider_start(self.update, self.context)
+
+    async def on_exit_SELECT(self, next_state):
+        if next_state == ChatState.SELECT_CONFIRM:
+            await handle_select_provider(self.update, self.context)
+
+    async def on_entry_SELECT_CONFIRM(self, prev_state):
+        await handle_select_confirm(self.update, self.context)
 
 
 USER_INFO = range(1)
@@ -130,38 +168,63 @@ async def start(update: Update, context: CallbackContext) -> None:
 
 
 async def response_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    # handles text and voice messages
+
     fsm = ChatFSM(update, context)
     state = fsm.current_state()
 
     print(state)
 
     if state == ChatState.INITIAL:
+        # If the state is initial, then we need to start the conversation
         fsm.change_state(ChatState.START)
         fsm.change_state(ChatState.LANGUAGE)
+
     if state == ChatState.START:
+        # Initiating the conversation. Welcome message is sent when getting out of the START state.
+        # Language prompt is shown when entering LANGUAGE state
+
         fsm.change_state(ChatState.LANGUAGE)
+
     elif state == ChatState.RESET:
-            if update.message.text == "yes":
-                fsm.change_state(ChatState.INITIAL)
-                await start(update, context)
-            elif update.message.text == "no":
-                fsm.go_back()
-            else:
-                await update.message.reply_text("Please enter yes or no")
-    elif state == ChatState.LANGUAGE:  # text message when asked language
-        await fsm.on_entry_LANGUAGE()
+        # Resetting the conversation.
+        if update.message.text == "yes":
+            fsm.change_state(ChatState.INITIAL)
+            await start(update, context)
+        elif update.message.text == "no":
+            # Go to the previous state and cancel resetting
+            fsm.go_back()
+        else:
+            await update.message.reply_text("Please enter yes or no")
+    elif state == ChatState.LANGUAGE:
+        # Handle text message when the language prompt is shown.
+
+        # Shows the language prompt again
+        await fsm.on_entry_LANGUAGE(prev_state=fsm.get_prev_state())
 
     elif state == ChatState.QUERY:
+        # Handle user queries.
 
         query = update.message.text
         keywords = ["odr", "dispute"]
         if query and any(keyword in query.lower() for keyword in keywords):
+            # If the query contains keywords, then we need to search for bpp. Prompt to select the
+            # odr type is shown when entering SEARCH state
             fsm.change_state(ChatState.SEARCH)
         else:
+            # Answer the users query
             await query_handler(update, context)
 
     elif state == ChatState.SEARCH:
-        await fsm.on_entry_SEARCH()
+        # Show the search prompt when text message is received in the same state
+        await fsm.on_entry_SEARCH(prev_state=fsm.get_prev_state())
+    elif state == ChatState.SELECT_CONFIRM:
+        if update.message.text == "yes":
+            fsm.change_state(ChatState.INIT)
+        elif update.message.text == "no":
+            fsm.change_state(ChatState.SEARCH)
+        else:
+            await update.message.reply_text("Please enter yes or no")
 
 
 async def button_callback(update: Update, context: CallbackContext):
@@ -173,12 +236,14 @@ async def button_callback(update: Update, context: CallbackContext):
     prev_state = fsm.get_prev_state()
 
     if button_data.startswith('select_provider_'):
-        pass
+
+        if state == ChatState.SELECT:
+            fsm.change_state(ChatState.SELECT_CONFIRM)
         # bpp_details = odr_client.search_bpp(context._user_id, provider_id=provider_id, category="civil-dispute")
         # await select_provider(update, provider_id)
     elif button_data.startswith('search_'):
         if state == ChatState.SEARCH:
-            await handle_search(update, context)
+            fsm.change_state(ChatState.SELECT)
         else:
             fsm.change_state(ChatState.SEARCH)
 
@@ -231,25 +296,6 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.TEXT | filters.VOICE, response_handler))
 
     application.add_handler(CallbackQueryHandler(button_callback))
-
-    #     application.add_handler(CommandHandler("start", start))
-    #
-    #     application.add_handler(CommandHandler('set_language', language_handler))
-    #
-    # # remove handler when init is done
-    #     application.add_handler(CommandHandler("conv", initialize_order))
-    #
-    #     conversation_handler = ConversationHandler(
-    #         entry_points=[MessageHandler(filters.TEXT, initialize_order)],
-    #         states={
-    #             USER_INFO: [MessageHandler(filters.TEXT, user_details_conv)],
-    #         },
-    #         fallbacks=[],
-    #     )
-
-    # Modify the handlers
-
-    # application.add_handler(conversation_handler)
 
     application.run_polling()
 
