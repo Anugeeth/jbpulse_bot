@@ -17,7 +17,7 @@ from telegram.ext import (
 import fsm
 from handlers import handle_start, language_handler, query_handler, handle_language_change, handle_search, handle_odr, \
     handle_reset, handle_select_provider, handle_select_provider_start, handle_select_confirm, handle_billing_form, \
-    handle_init_order
+    handle_init_order, save_user_data, handle_confirm_start, handle_confirm_order
 
 
 class ChatState(Enum):
@@ -47,7 +47,7 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
         ChatState.SELECT: (ChatState.SELECT_CONFIRM, ChatState.LANGUAGE, ChatState.RESET),
         ChatState.SELECT_CONFIRM: (ChatState.INIT, ChatState.SEARCH, ChatState.LANGUAGE, ChatState.RESET),
         ChatState.INIT: (ChatState.CONFIRM, ChatState.LANGUAGE, ChatState.RESET),
-        ChatState.CONFIRM: None
+        ChatState.CONFIRM: (ChatState.QUERY, ChatState.LANGUAGE, ChatState.RESET),
 
     }
 
@@ -115,10 +115,18 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
         if next_state == ChatState.CONFIRM:
             await handle_init_order(self.update, self.context)
 
+    async def on_entry_CONFIRM(self, prev_state):
+        if prev_state == ChatState.INIT:
+            await handle_confirm_start(self.update, self.context)
+
+    async def on_exit_CONFIRM(self, next_state):
+         await handle_confirm_order(self.update, self.context)
+
+
 
 USER_INFO = range(1)
 
-bot = Bot(token="6567325826:AAGKVgUk8o424z4IMnitfwLTbqbKtNN_Qjo")
+bot = Bot(token="6476677118:AAF1SLFv_M1JEh5QhfKcst2M2Ol911Vf5vU")
 
 try:
     from telegram import __version_info__
@@ -213,9 +221,12 @@ async def response_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         else:
             await update.message.reply_text("Please enter yes or no")
 
-    elif state == ChatState.INIT:
+    elif state == ChatState.CONFIRM:
+        if update.message.text == "yes":
+            fsm.change_state(ChatState.QUERY)
+        elif update.message.text == "no":
+            await fsm.on_entry_CONFIRM(prev_state=fsm.get_prev_state())
         # Initialize the order. Ask for user details
-        pass
 
 
 
@@ -251,13 +262,14 @@ async def button_callback(update: Update, context: CallbackContext):
 
 
 async def init_data_handler(update: Update, context: CallbackContext):
-    data = json.loads(update.effective_message.web_app_data.data)
-    await update.message.reply_html(
-        text=(
-            json.dumps(data)
-        ),
-        reply_markup=ReplyKeyboardRemove(),
-    )
+    fsm = ChatFSM(update, context)
+    state = fsm.current_state()
+
+    if state == ChatState.INIT:
+        data = json.loads(update.effective_message.web_app_data.data)
+        save_user_data(context._user_id, data)
+        fsm.change_state(ChatState.CONFIRM)
+
 
 
 async def initialize_order(update, context):

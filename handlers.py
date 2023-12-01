@@ -138,7 +138,7 @@ async def handle_select_provider(update: Update, context: CallbackContext):
     provider_id = button_data[len('select_provider_'):]
     provider_info = redis_client.get(provider_id)
     provider_info = json.loads(provider_info)
-    print(provider_info)
+
     await select_provider(update, provider_info, context)
 
 
@@ -171,8 +171,6 @@ async def select_provider(update: Update, provider_info: dict, context):
     provider_details = odr_client.select_provider_and_item(context._user_id, provider_info["provider_id"],
                                                            provider_info["item_id"],
                                                            provider_info["bpp_id"], provider_info["bpp_uri"])
-
-    print(json.dumps(provider_details["data"], indent=4))
 
     order = None
 
@@ -227,15 +225,15 @@ async def connect_to_odr_providers(update: Update, context: CallbackContext, cat
             for item in provider["items"]:
                 if item["descriptor"]["code"] == "arbitration-service":
                     item_id = item["id"]
+
+                    providers_list.append(
+                        {"name": provider["descriptor"]["name"], "provider_id": provider["id"], "item_id": item_id,
+                         "bpp_id": providers["context"]["bpp_id"],
+                         "bpp_uri": providers["context"]["bpp_uri"]})
+
                     break
 
-            providers_list.append(
-                {"name": provider["descriptor"]["name"], "provider_id": provider["id"], "item_id": item_id,
-                 "bpp_id": providers["context"]["bpp_id"],
-                 "bpp_uri": providers["context"]["bpp_uri"]})
-
     for provider in providers_list:
-        print(provider)
         redis_client.set(f'{context._user_id}_{provider["provider_id"]}', json.dumps(provider))
 
     buttons = [InlineKeyboardButton(text=provider["name"],
@@ -262,8 +260,35 @@ async def handle_billing_form(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def handle_init_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    pass
+
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Initializing your order")
+    user_data = redis_client.get(context._user_id)
+    user_data = json.loads(user_data)
+    res = odr_client.init_order(context._user_id, user_data)
+    link = ""
+
+    for data in res["data"]:
+        try:
+            link = data["message"]["order"]["items"][0]["xinput"]["url"]
+            break
+        except:
+            pass
+
+    inline_keyboard_buttons = [InlineKeyboardButton("Open form", url=link)]
+    await context.bot.send_message(chat_id=update.effective_chat.id, reply_markup=inline_keyboard_buttons, text="Please fill the form")
 
 
-def save_user_data(data):
-    redis_client.set(data["user_id"], json.dumps(data))
+async def handle_confirm_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    buttons = [KeyboardButton("yes"), KeyboardButton("no")]
+    button_markup = ReplyKeyboardMarkup([buttons], one_time_keyboard=True, is_persistent=True)
+
+    await context.bot.send_message(chat_id=update.effective_chat.id,
+                                   text='Submitted the form?', reply_markup=button_markup)
+
+
+async def handle_confirm_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    res = odr_client.confirm_order(context._user_id)
+    print(json.dumps(res, indent=4))
+
+def save_user_data(uid, data):
+    redis_client.set(uid, json.dumps(data))

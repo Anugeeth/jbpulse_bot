@@ -48,7 +48,7 @@ class ODRApiClient:
 
         existing_transaction = get_user_state(self.db ,user_id)
 
-        if existing_transaction is None:
+        if existing_transaction is None or not existing_transaction["state"] == "SEARCH":
             create_transaction_record(self.db ,user_id, "SEARCH", category)
         elif existing_transaction["state"] == "SEARCH":
             transaction_id = existing_transaction["transaction_id"]
@@ -69,13 +69,15 @@ class ODRApiClient:
                 }
             }
         }
+        print(payload)
 
         return self._make_request(endpoint, payload)
 
     def select_provider_and_item(self, user_id, provider_id, item_id, bpp_id , bpp_uri):
         endpoint = "select"
         transaction_id=""
-
+        print("item_id")
+        print(item_id)
 
         last_search_transaction = get_user_state(self.db, user_id)
 
@@ -86,7 +88,7 @@ class ODRApiClient:
 
         if last_search_transaction["state"] == "SEARCH":
             transaction_id = last_search_transaction["transaction_id"]
-            update_user_state(self.db ,user_id, transaction_id, "SELECT")
+            update_transaction_state(self.db , transaction_id, "SELECT")
 
 
         payload = {
@@ -108,7 +110,8 @@ class ODRApiClient:
     def init_order(self, user_id, customer_details):
         endpoint = "init"
         transaction = get_user_state(self.db, user_id)
-
+        print("transaction")
+        print(transaction)
         if transaction["state"] != "SELECT":
             return {"error": "No transaction found"}
         
@@ -128,7 +131,7 @@ class ODRApiClient:
                     "provider": {"id": transaction["provider_id"]},
                     "items": [
                         {
-                            "id": transaction["item_id"],
+                            "id": transaction["service_id"],
                             "xinput": {
                                 "form_response": {
                                     "status": True,
@@ -164,6 +167,7 @@ class ODRApiClient:
         }
 
         update_transaction_state(self.db , transaction["transaction_id"], "INIT")
+        print(payload)
         return self._make_request(endpoint, payload)
 
     def confirm_order(self, user_id):
