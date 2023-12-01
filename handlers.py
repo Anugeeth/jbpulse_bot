@@ -31,6 +31,13 @@ async def handle_query_response(update: Update, context, query: str, voice_messa
                                      voice=audio_data)
 
 
+
+async def handle_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+
+    await context.bot.send_message(chat_id=update.effective_chat.id,
+                           text='Are you sure you want to reset the bot?')
+
+
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_name = update.message.chat.first_name
     welcome_message = (

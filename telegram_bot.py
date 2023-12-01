@@ -14,14 +14,16 @@ from telegram.ext import (
     filters,
     CallbackContext,
     CallbackQueryHandler,
-    ConversationHandler
+    ConversationHandler, CommandHandler
 )
-from handlers import handle_start, language_handler, query_handler, handle_language_change, handle_search, handle_odr
+from handlers import handle_start, language_handler, query_handler, handle_language_change, handle_search, handle_odr, \
+    handle_reset
 import fsm
 
 
 class ChatState(Enum):
     START = auto()
+    RESET = auto()
     LANGUAGE = auto()
     QUERY = auto()
     SEARCH = auto()
@@ -76,6 +78,9 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
     async def on_exit_START(self):
         await handle_start(self.update, self.context)
 
+    async def pre_RESET(self):
+        await handle_reset(self.update, self.context)
+
     async def on_entry_LANGUAGE(self):
         await language_handler(self.update, self.context)
 
@@ -113,6 +118,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+
+async def start(update: Update, context: CallbackContext) -> None:
+    """Send a message when the command /start is issued."""
+    if not context.user_data.get("state"):
+        context.user_data["state"] = ChatState.START
+
+    await response_handler(update, context)
+
 async def response_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     fsm = ChatFSM(update, context)
@@ -120,6 +133,7 @@ async def response_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     if state == ChatState.START:
         fsm.change_state(ChatState.LANGUAGE)
+    elif state == ChatState.RESET:
 
     elif state == ChatState.LANGUAGE: #text message when asked language
         await fsm.on_entry_LANGUAGE()
@@ -200,6 +214,9 @@ async def user_details_conv(update, context):
 
 def main() -> None:
     application = ApplicationBuilder().bot(bot).build()
+
+    application.add_handler(CommandHandler('start', start))
+
 
     application.add_handler(MessageHandler(filters.TEXT | filters.VOICE, response_handler))
 
