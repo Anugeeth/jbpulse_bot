@@ -112,6 +112,7 @@ class ODRApiClient:
                         user_id= transaction["user_id"],
                         name= customer_details["name"],
                         email= customer_details["email"],
+                        phone = customer_details["phone"],
                         address= customer_details["address"],
                         city=  customer_details["city"]
                     )

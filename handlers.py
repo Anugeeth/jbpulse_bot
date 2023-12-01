@@ -257,7 +257,7 @@ async def handle_billing_form(update: Update, context: ContextTypes.DEFAULT_TYPE
         reply_markup=ReplyKeyboardMarkup.from_button(
             KeyboardButton(
                 text="Open the color picker!",
-                web_app=WebAppInfo(url="https://4c0e-106-194-45-76.ngrok-free.app/"),
+                web_app=WebAppInfo(url="https://f33f-117-243-133-238.ngrok-free.app/mini_app/"),
             )
         ),
     )
