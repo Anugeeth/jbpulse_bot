@@ -6,16 +6,16 @@ import inspect
 __all__ = ["FiniteStateMachineMixin", "BaseFiniteStateMachineMixin"]
 
 
-async def callSeqentially(task1, task2, **kwargs):
+async def callSeqentially(task1, task2, prev_state, next_state, **kwargs):
     if inspect.iscoroutinefunction(task1):
-        await task1(**kwargs)
+        await task1(next_state=next_state, **kwargs)
     elif inspect.isfunction(task1):
-        task1(**kwargs)
+        task1(next_state=next_state,**kwargs)
 
     if inspect.iscoroutinefunction(task2):
-        await task2(**kwargs)
+        await task2(prev_state=prev_state, **kwargs)
     elif inspect.isfunction(task2):
-        task2(**kwargs)
+        task2(prev_state=prev_state, **kwargs)
 
 class BaseFiniteStateMachineMixin:
     """Base Mixin to add a state_machine behavior.
@@ -150,7 +150,7 @@ class BaseFiniteStateMachineMixin:
 
         if entry_fn or exit_fn:
             try:
-                asyncio.create_task(callSeqentially(exit_fn, entry_fn, **kwargs))
+                asyncio.create_task(callSeqentially(exit_fn, entry_fn, previous_state, next_state,**kwargs))
             except AbortTransition:
                 return previous_state
 

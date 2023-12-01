@@ -1,13 +1,7 @@
-import asyncio
-
 import logging
 from enum import Enum, auto
 
-# from translate import translate_strings
-# from redis_conn import RedisConnection
-
-
-from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, Bot
 from telegram import __version__ as TG_VER
 from telegram.ext import (
     ApplicationBuilder,
@@ -16,14 +10,18 @@ from telegram.ext import (
     filters,
     CallbackContext,
     CallbackQueryHandler,
-    ConversationHandler
+    ConversationHandler, CommandHandler
 )
-from handlers import handle_start, language_handler, query_handler, handle_language_change, handle_search, handle_odr
+
 import fsm
+from handlers import handle_start, language_handler, query_handler, handle_language_change, handle_search, handle_odr, \
+    handle_reset
 
 
 class ChatState(Enum):
+    INITIAL = auto()
     START = auto()
+    RESET = auto()
     LANGUAGE = auto()
     QUERY = auto()
     SEARCH = auto()
@@ -35,26 +33,26 @@ class ChatState(Enum):
 
 class ChatFSM(fsm.FiniteStateMachineMixin):
     state_machine = {
+        ChatState.INITIAL: (ChatState.START,),
         ChatState.START: (ChatState.LANGUAGE,),
+        ChatState.RESET: '__all__',
         ChatState.LANGUAGE: '__all__',
-        ChatState.QUERY: (ChatState.SEARCH, ChatState.LANGUAGE),
-        ChatState.SEARCH: (ChatState.SEARCH),
-        ChatState.SEARCH: None
+        ChatState.QUERY: (ChatState.SEARCH, ChatState.LANGUAGE, ChatState.RESET),
+        ChatState.SEARCH: (ChatState.SELECT, ChatState.QUERY, ChatState.LANGUAGE, ChatState.RESET),
+        ChatState.SELECT: None
     }
 
     def __init__(self, update, context):
         super().__init__()
         if not context.user_data.get("state"):
-            context.user_data["state"] = ChatState.START
+            context.user_data["state"] = ChatState.INITIAL
 
         if not context.user_data.get("state_prev"):
             context.user_data["state_prev"] = None
 
-
         self.update = update
         self.context = context
         self.state = self.get_curr_state()
-
 
     def get_prev_state(self):
         return self.context.user_data["state_prev"]
@@ -75,26 +73,29 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
         self.set_curr_state(next_state)
         self.set_prev_state(previous_state)
 
-    async def on_exit_START(self):
+    async def on_exit_START(self, next_state):
         await handle_start(self.update, self.context)
 
-    async def on_entry_LANGUAGE(self):
+    async def on_entry_RESET(self, prev_state):
+        await handle_reset(self.update, self.context)
+
+    async def on_entry_LANGUAGE(self, prev_state):
         await language_handler(self.update, self.context)
 
-    async def on_exit_LANGUAGE(self):
+    async def on_exit_LANGUAGE(self, next_state):
         await handle_language_change(self.update, self.context)
 
-    async def on_entry_SEARCH(self):
+    async def on_entry_SEARCH(self, prev_state):
         await handle_odr(self.update, self.context)
 
-
-    async def on_exit_SEARCH(self):
-        await handle_search(self.update, self.update)
+    async def on_exit_SEARCH(self, next_state):
+        if next_state == ChatState.SELECT:
+            await handle_search(self.update, self.update)
 
 
 USER_INFO = range(1)
 
-bot = Bot(token="6567325826:AAGKVgUk8o424z4IMnitfwLTbqbKtNN_Qjo")
+bot = Bot(token="6476677118:AAF1SLFv_M1JEh5QhfKcst2M2Ol911Vf5vU")
 
 try:
     from telegram import __version_info__
@@ -115,15 +116,39 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def response_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-
+async def start(update: Update, context: CallbackContext) -> None:
+    """Send a message when the command /start is issued."""
     fsm = ChatFSM(update, context)
     state = fsm.current_state()
 
+    if state == ChatState.INITIAL:
+        fsm.change_state(ChatState.START)
+    else:
+        fsm.change_state(ChatState.RESET)
+
+    await response_handler(update, context)
+
+
+async def response_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    fsm = ChatFSM(update, context)
+    state = fsm.current_state()
+
+    print(state)
+
+    if state == ChatState.INITIAL:
+        fsm.change_state(ChatState.START)
+        fsm.change_state(ChatState.LANGUAGE)
     if state == ChatState.START:
         fsm.change_state(ChatState.LANGUAGE)
-
-    elif state == ChatState.LANGUAGE: #text message when asked language
+    elif state == ChatState.RESET:
+            if update.message.text == "yes":
+                fsm.change_state(ChatState.INITIAL)
+                await start(update, context)
+            elif update.message.text == "no":
+                fsm.go_back()
+            else:
+                await update.message.reply_text("Please enter yes or no")
+    elif state == ChatState.LANGUAGE:  # text message when asked language
         await fsm.on_entry_LANGUAGE()
 
     elif state == ChatState.QUERY:
@@ -137,8 +162,6 @@ async def response_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     elif state == ChatState.SEARCH:
         await fsm.on_entry_SEARCH()
-
-
 
 
 async def button_callback(update: Update, context: CallbackContext):
@@ -202,6 +225,8 @@ async def user_details_conv(update, context):
 
 def main() -> None:
     application = ApplicationBuilder().bot(bot).build()
+
+    application.add_handler(CommandHandler('start', start))
 
     application.add_handler(MessageHandler(filters.TEXT | filters.VOICE, response_handler))
 
