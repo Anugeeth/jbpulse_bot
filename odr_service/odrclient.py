@@ -33,7 +33,7 @@ class ODRApiClient:
     def _make_request(self, endpoint, payload):
         url = f"{self.bap_uri}/{endpoint}"
         headers = {'Content-Type': 'application/json'}
-        response = requests.post(url, data=json.dumps(payload), headers=headers)
+        response = requests.post(url, data=json.dumps(payload, default=str), headers=headers)
         if response.status_code == 200:
             print(response.text)
             return json.loads(response.text)
