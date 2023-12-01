@@ -39,8 +39,8 @@ def update_transaction_state(db, transaction_id, new_state):
         {"$set": {"state": new_state}}
     )
 
-def get_transaction_details(db, transaction_id):
-    return db.transactions.find_one({"transaction_id": transaction_id})
+def get_transaction_details(db, user_id):
+    return db.transactions.find_one({"user_id": user_id})
 
 def get_user_state(db, user_id):
     result = db.transactions.find_one({"user_id": user_id},sort=[("timestamp", pymongo.DESCENDING)])

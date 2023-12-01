@@ -1,140 +1,154 @@
 <!DOCTYPE html>
 <html lang="en">
-   <head>
-      <script src="https://telegram.org/js/telegram-web-app.js"></script>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>User Details Form</title>
-      <style>
-         body {
-         font-family: sans-serif;
-         }
-         form {
-         display: flex;
-         flex-direction: column;
-         width: 500px;
-         margin: 0 auto;
-         }
-         label {
-         display: block;
-         margin-bottom: 5px;
-         }
-         input {
-         width: 100%;
-         padding: 10px;
-         border: 1px solid #ccc;
-         }
-         button {
-         padding: 10px 20px;
-         border: none;
-         background-color: #007bff;
-         color: white;
-         cursor: pointer;
-         }
-         .error {
-         color: red;
-         }
-      </style>
-   </head>
-   <body>
-      <h1>User Details Form</h1>
-      <form id="userForm">
-         <label
-            for="name">Name:</label>
-         <input type="text" id="name" name="name" required>
-         <label
-            for="email">Email:</label>
-         <input
-            type="email"
-            id="email"
-            name="email" required>
-         <label
-            for="address">Address:</label>
-         <input
-            type="text"
-            id="address"
-            name="address"
-            required>
-         <label
-            for="city">City:</label>
-         <input
-            type="text"
-            id="city"
-            name="city"
-            required>
-         <label
-            for="phone">Phone Number:</label>
-         <input type="tel" id="phone" name="phone" required>
-         <button type="submit">Submit</button>
-      </form>
-      <script type="text/javascript">
-          Telegram.WebApp.ready();
 
-         const form = document.getElementById('userForm');
-         form.addEventListener('submit', handleSubmit);
+<head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Details Form</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            /* background-color: #f5f5f5; */
+            margin: 0;
+            padding: 0;
+            /* display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh; */
+        }
 
-         function handleSubmit(event) {
-             event.preventDefault();
+        h2 {
+            text-align: center;
+            color: #ffffff;
+        }
 
-             const formData = new FormData(form);
-             const errors = validateForm(formData);
+        form {
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 80vw;
+            max-width: 400px;
+            margin: 0 auto;
+        }
 
-             if (errors.length === 0) {
-                 // Submit form data to server
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .error {
+            color: red;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>User Details Form</h2>
+    <form id="userForm">
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" placeholder="" required>
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" placeholder="" required>
+        <label for="address">Address:</label>
+        <input type="text" id="address" name="address" placeholder="" required>
+        <label for="city">City:</label>
+        <input type="text" id="city" name="city" placeholder="" required>
+        <label for="phone">Phone Number:</label>
+        <input type="tel" id="phone" name="phone" placeholder="" required>
+        <button type="submit">Submit</button>
+    </form>
+    <script type="text/javascript">
+        Telegram.WebApp.ready();
+
+        const form = document.getElementById('userForm');
+        form.addEventListener('submit', handleSubmit);
+
+        function handleSubmit(event) {
+            event.preventDefault();
+
+            const formData = new FormData(form);
+            const errors = validateForm(formData);
+
+            if (errors.length === 0) {
+                // Submit form data to server
                 const data = JSON.stringify(Object.fromEntries(formData));
                 Telegram.WebApp.sendData(data);
                 Telegram.WebApp.close();
-                 console.log('Form data:', formData);
-             } else {
-                 displayErrors(errors);
-             }
-         }
+                console.log('Form data:', formData);
+            } else {
+                displayErrors(errors);
+            }
+        }
 
-         function validateForm(formData) {
-             const errors = [];
+        function validateForm(formData) {
+            const errors = [];
 
-             const name = formData.get('name');
-             if (!name) {
-                 errors.push({ field: 'name', message: 'Name is required' });
-             }
+            const name = formData.get('name');
+            if (!name) {
+                errors.push({ field: 'name', message: 'Name is required' });
+            }
 
-             const email = formData.get('email');
-             if (!email) {
-                 errors.push({ field: 'email', message: 'Email is required' });
-             } else if (!isEmailValid(email)) {
-                 errors.push({ field: 'email', message: 'Invalid email format' });
-             }
+            const email = formData.get('email');
+            if (!email) {
+                errors.push({ field: 'email', message: 'Email is required' });
+            } else if (!isEmailValid(email)) {
+                errors.push({ field: 'email', message: 'Invalid email format' });
+            }
 
-             const address = formData.get('address');
-             if (!address) {
-                 errors.push({ field: 'address', message: 'Address is required' });
-             }
+            const address = formData.get('address');
+            if (!address) {
+                errors.push({ field: 'address', message: 'Address is required' });
+            }
 
-             const city = formData.get('city');
-             if (!city) {
-                 errors.push({ field: 'city', message: 'City is required' });
-             }
+            const city = formData.get('city');
+            if (!city) {
+                errors.push({ field: 'city', message: 'City is required' });
+            }
 
-             const phone = formData.get('phone');
-             if (!phone) {
-                 errors.push({ field: 'phone', message: 'Phone number is required' });
-             }
+            const phone = formData.get('phone');
+            if (!phone) {
+                errors.push({ field: 'phone', message: 'Phone number is required' });
+            }
 
-             return errors;
-         }
+            return errors;
+        }
 
-         function displayErrors(errors) {
-             for (const error of errors) {
-                 const field = document.getElementById(error.field);
-                 field.classList.add('error');
-                 field.nextElementSibling.textContent = error.message;
-             }
-         }
+        function displayErrors(errors) {
+            for (const error of errors) {
+                const field = document.getElementById(error.field);
+                field.classList.add('error');
+                field.nextElementSibling.textContent = error.message;
+            }
+        }
 
-         function isEmailValid(email) {
-             const regex = /^(([^<>()[\]\\.,;:\s@"]+)@([a-zA-Z0-9-.]+))\.([a-zA-Z]{2,})$/;
-             return regex.test(email);
-         }
-      </script>
-   </body>
+        function isEmailValid(email) {
+            const regex = /^(([^<>()[\]\\.,;:\s@"]+)@([a-zA-Z0-9-.]+))\.([a-zA-Z]{2,})$/;
+            return regex.test(email);
+        }
+    </script>
+</body>
+
 </html>
