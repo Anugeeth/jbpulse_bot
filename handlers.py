@@ -33,9 +33,11 @@ async def handle_query_response(update: Update, context, query: str, voice_messa
 
 
 async def handle_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    buttons = [KeyboardButton("yes"), KeyboardButton("no")]
+    button_markup = ReplyKeyboardMarkup([buttons], one_time_keyboard=True , is_persistent=True)
 
     await context.bot.send_message(chat_id=update.effective_chat.id,
-                           text='Are you sure you want to reset the bot?')
+                           text='Are you sure you want to reset the bot?', reply_markup=button_markup)
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
