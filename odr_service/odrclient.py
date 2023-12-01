@@ -105,9 +105,13 @@ class ODRApiClient:
         return select_res
 
 
-    def init_order(self, transaction_id, customer_details):
+    def init_order(self, user_id, customer_details):
         endpoint = "init"
-        transaction = get_transaction_details(self.db, transaction_id)
+        transaction = get_user_state(self.db, user_id)
+
+        if transaction["state"] != "SELECT":
+            return {"error": "No transaction found"}
+        
         create_user(self.db, 
                         user_id= transaction["user_id"],
                         name= customer_details["name"],
@@ -118,7 +122,7 @@ class ODRApiClient:
                     )
         
         payload = {
-            "context": self._make_context(action = endpoint , transaction_id = transaction_id , bpp_id=transaction["bpp_id"] , bpp_uri= transaction["bpp_uri"]),
+            "context": self._make_context(action = endpoint , transaction_id = transaction["transaction_id"] , bpp_id=transaction["bpp_id"] , bpp_uri= transaction["bpp_uri"]),
             "message": {
                 "order": {
                     "provider": {"id": transaction["provider_id"]},
@@ -159,20 +163,23 @@ class ODRApiClient:
             }
         }
 
-        update_transaction_state(self.db , transaction_id, "INIT")
+        update_transaction_state(self.db , transaction["transaction_id"], "INIT")
         return self._make_request(endpoint, payload)
 
-    def confirm_order(self, transaction_id):
+    def confirm_order(self, user_id):
         endpoint = "confirm"
 
-        transaction = get_transaction_details(self.db, transaction_id)
+        transaction = get_user_state(self.db, user_id)
 
-        if transaction["state"] == "CONFIRM":
-            return {"error": "User is already in CONFIRM state"}
+        if transaction["state"] != "INIT":
+            return {"error": "No transaction found"}
+
+        # if transaction["state"] == "CONFIRM":
+        #     return {"error": "User is already in CONFIRM state"}
 
         customer_details=get_user_details(transaction["user_id"])
         payload = {
-            "context": self._make_context(action = endpoint , transaction_id = transaction_id , bpp_id=transaction["bpp_id"] , bpp_uri= transaction["bpp_uri"]),
+            "context": self._make_context(action = endpoint , transaction_id = transaction["transaction_id"] , bpp_id=transaction["bpp_id"] , bpp_uri= transaction["bpp_uri"]),
             "message": {
                 "order": {
                     "provider": {"id": transaction["provider_id"]},
@@ -217,5 +224,5 @@ class ODRApiClient:
             }
         }
 
-        update_transaction_state(self.db, transaction_id, "CONFIRM")
+        update_transaction_state(self.db, transaction["transaction_id"], "CONFIRM")
         return self._make_request(endpoint, payload)
