@@ -181,7 +181,7 @@ class ODRApiClient:
         # if transaction["state"] == "CONFIRM":
         #     return {"error": "User is already in CONFIRM state"}
 
-        customer_details=get_user_details(transaction["user_id"])
+        customer_details=get_user_details(self.db, transaction["user_id"])
         payload = {
             "context": self._make_context(action = endpoint , transaction_id = transaction["transaction_id"] , bpp_id=transaction["bpp_id"] , bpp_uri= transaction["bpp_uri"]),
             "message": {

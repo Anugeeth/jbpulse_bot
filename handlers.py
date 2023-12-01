@@ -68,6 +68,9 @@ async def language_handler(update: Update, context: CallbackContext):
                                    reply_markup=reply_markup)
 
 
+async def handle_query_entry(update: Update, context: CallbackContext):
+    await context.bot.send_message(chat_id=update.effective_chat.id,
+                                   text="Type any other legal question or topic you want help with.")
 async def handle_odr(update: Update, context: CallbackContext):
     text_message = "Connecting you to ODR providers."
 
@@ -269,13 +272,16 @@ async def handle_init_order(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     for data in res["data"]:
         try:
-            link = data["message"]["order"]["items"][0]["xinput"]["url"]
+            print(data)
+            link = data["message"]["order"]["items"][0]["xinput"]["form"]["url"]
             break
         except:
             pass
 
-    inline_keyboard_buttons = [InlineKeyboardButton("Open form", url=link)]
-    await context.bot.send_message(chat_id=update.effective_chat.id, reply_markup=inline_keyboard_buttons, text="Please fill the form")
+
+
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Please fill the form")
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=link)
 
 
 async def handle_confirm_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

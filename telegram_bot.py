@@ -17,7 +17,7 @@ from telegram.ext import (
 import fsm
 from handlers import handle_start, language_handler, query_handler, handle_language_change, handle_search, handle_odr, \
     handle_reset, handle_select_provider, handle_select_provider_start, handle_select_confirm, handle_billing_form, \
-    handle_init_order, save_user_data, handle_confirm_start, handle_confirm_order
+    handle_init_order, save_user_data, handle_confirm_start, handle_confirm_order, handle_query_entry
 
 
 class ChatState(Enum):
@@ -93,6 +93,9 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
 
     async def on_exit_LANGUAGE(self, next_state):
         await handle_language_change(self.update, self.context)
+
+    async def on_entry_QUERY(self, prev_state):
+        await handle_query_entry(self.update, self.context)
 
     async def on_entry_SEARCH(self, prev_state):
         await handle_odr(self.update, self.context)
@@ -270,34 +273,6 @@ async def init_data_handler(update: Update, context: CallbackContext):
         save_user_data(context._user_id, data)
         fsm.change_state(ChatState.CONFIRM)
 
-
-
-async def initialize_order(update, context):
-    context.user_data['user_id'] = update.message.from_user.id
-    await update.message.reply_text("What's your full name?")
-
-    return USER_INFO
-
-
-async def user_details_conv(update, context):
-    info_fields = ["name", "email", "phone", "address", "city"]
-    current_field = context.user_data.get("current_field", 0)
-
-    if current_field < len(info_fields):
-        context.user_data[info_fields[current_field]] = update.message.text
-        current_field += 1
-        context.user_data["current_field"] = current_field
-
-        if current_field < len(info_fields):
-            await update.message.reply_text(f"What's your {info_fields[current_field]}?")
-        else:
-            # store
-
-            context.user_data.clear()
-            await update.message.reply_text("Done!")
-            return ConversationHandler.END
-
-    return USER_INFO
 
 
 def main() -> None:
