@@ -151,11 +151,11 @@ async def select_provider(update: Update, provider_info: dict, context):
     order = None
 
     for provider in provider_details["data"]:
-        if provider["message"]["order"]["provider"]["id"] == provider_info["provider_id"]:
+        if provider["message"]["order"]["providers"]["id"] == provider_info["provider_id"]:
             order = provider["message"]["order"]
             break
 
-    provider_info = order["provider"]["descriptor"]
+    provider_info = order["providers"]["descriptor"]
 
     provider_name = provider_info["name"]
     provider_short_desc = provider_info["short_desc"]
@@ -195,7 +195,7 @@ async def connect_to_odr_providers(update: Update, context: CallbackContext, cat
     providers_list = []
 
     for providers in providers_data["data"]:
-        for provider in providers["message"]["provider"]:
+        for provider in providers["message"]["providers"]:
             item_id = ""
             for item in provider["items"]:
                 if item["descriptor"]["code"] == "arbitration-service":
