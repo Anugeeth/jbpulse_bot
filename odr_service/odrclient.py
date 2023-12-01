@@ -105,18 +105,25 @@ class ODRApiClient:
         return select_res
 
 
-    def init_order(self, provider_id, item_id, customer_details, bpp_id, bpp_uri):
+    def init_order(self, transaction_id, customer_details):
         endpoint = "init"
-        transaction_id = str(uuid.uuid4())
-
+        transaction = get_transaction_details(self.db, transaction_id)
+        create_user(self.db, 
+                        user_id= transaction["user_id"],
+                        name= customer_details["name"],
+                        email= customer_details["email"],
+                        address= customer_details["address"],
+                        city=  customer_details["city"]
+                    )
+        
         payload = {
-            "context": self._make_context(action = endpoint , transaction_id = transaction_id , bpp_id=bpp_id , bpp_uri= bpp_uri),
+            "context": self._make_context(action = endpoint , transaction_id = transaction_id , bpp_id=transaction["bpp_id"] , bpp_uri= transaction["bpp_uri"]),
             "message": {
                 "order": {
-                    "provider": {"id": provider_id},
+                    "provider": {"id": transaction["provider_id"]},
                     "items": [
                         {
-                            "id": item_id,
+                            "id": transaction["item_id"],
                             "xinput": {
                                 "form_response": {
                                     "status": True,
@@ -151,30 +158,30 @@ class ODRApiClient:
             }
         }
 
+        update_transaction_state(self.db , transaction_id, "INIT")
         return self._make_request(endpoint, payload)
 
-    def confirm_order(self, user_id, provider_id, item_id, customer_details, submission_id, bpp_id, bpp_uri):
+    def confirm_order(self, transaction_id):
         endpoint = "confirm"
 
-        existing_transaction = get_user_state(self.db, user_id)
+        transaction = get_transaction_details(self.db, transaction_id)
 
-        if existing_transaction["state"] == "CONFIRM":
+        if transaction["state"] == "CONFIRM":
             return {"error": "User is already in CONFIRM state"}
 
-        transaction_id = existing_transaction["transaction_id"]
-
+        customer_details=get_user_details(transaction["user_id"])
         payload = {
-            "context": self._make_context(action = endpoint , transaction_id = transaction_id , bpp_id=bpp_id , bpp_uri= bpp_uri),
+            "context": self._make_context(action = endpoint , transaction_id = transaction_id , bpp_id=transaction["bpp_id"] , bpp_uri= transaction["bpp_uri"]),
             "message": {
                 "order": {
-                    "provider": {"id": provider_id},
+                    "provider": {"id": transaction["provider_id"]},
                     "items": [
                         {
-                            "id": item_id,
+                            "id": transaction["item_id"],
                             "xinput": {
                                 "form_response": {
                                     "status": True,
-                                    "submission_id": submission_id
+                                    "submission_id": str(uuid.uuid4())
                                 }
                             }
                         }
@@ -209,5 +216,5 @@ class ODRApiClient:
             }
         }
 
-        update_user_state(self.db, user_id, transaction_id, "CONFIRM")
+        update_transaction_state(self.db, transaction_id, "CONFIRM")
         return self._make_request(endpoint, payload)
