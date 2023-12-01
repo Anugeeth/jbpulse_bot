@@ -8,6 +8,8 @@ from jb import get_query_response
 from odr_service.main import init
 from redis_conn import RedisConnection
 
+# from translate import prep_message
+
 odr_client = init()
 redis_client = RedisConnection().connect()
 
@@ -83,7 +85,11 @@ async def handle_odr(update: Update, context: CallbackContext):
     # dispute_reply_markup = KeyboardMarkup(dispute_button_rows, one_time_keyboard=True , is_persistent=True)
     dispute_reply_markup = InlineKeyboardMarkup(dispute_button_rows)
 
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Choose a Dispute Category:",
+
+# lang=context.user_data["language"]
+    # text = prep_message(rc=redis_client,text="select_dispute_category", lang="ml")
+    text = "select dispute category"
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=text,
                                    reply_markup=dispute_reply_markup)
 
 
