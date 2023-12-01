@@ -16,7 +16,8 @@ from telegram.ext import (
 
 import fsm
 from handlers import handle_start, language_handler, query_handler, handle_language_change, handle_search, handle_odr, \
-    handle_reset, handle_select_provider, handle_select_provider_start, handle_select_confirm, handle_billing_form
+    handle_reset, handle_select_provider, handle_select_provider_start, handle_select_confirm, handle_billing_form, \
+    handle_init_order
 
 
 class ChatState(Enum):
@@ -29,6 +30,7 @@ class ChatState(Enum):
     SELECT = auto()
     SELECT_CONFIRM = auto()
     INIT = auto()
+    CONFIRM = auto()
 
     def __str__(self):
         return self.name
@@ -44,7 +46,9 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
         ChatState.SEARCH: (ChatState.SELECT, ChatState.QUERY, ChatState.LANGUAGE, ChatState.RESET),
         ChatState.SELECT: (ChatState.SELECT_CONFIRM, ChatState.LANGUAGE, ChatState.RESET),
         ChatState.SELECT_CONFIRM: (ChatState.INIT, ChatState.SEARCH, ChatState.LANGUAGE, ChatState.RESET),
-        ChatState.INIT: None,
+        ChatState.INIT: (ChatState.CONFIRM, ChatState.LANGUAGE, ChatState.RESET),
+        ChatState.CONFIRM: None
+
     }
 
     def __init__(self, update, context):
@@ -107,6 +111,10 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
     async def on_entry_INIT(self, prev_state):
         await handle_billing_form(self.update, self.context)
 
+    async def on_exit_INIT(self, next_state):
+        if next_state == ChatState.CONFIRM:
+            await handle_init_order(self.update, self.context)
+
 
 USER_INFO = range(1)
 
@@ -135,7 +143,6 @@ async def start(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
     fsm = ChatFSM(update, context)
     state = fsm.current_state()
-    await handle_billing_form(update, context)
 
     if state == ChatState.INITIAL:
         fsm.change_state(ChatState.START)

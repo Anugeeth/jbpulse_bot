@@ -14,11 +14,12 @@ odr_client = init()
 redis_client = RedisConnection().connect()
 
 
-async def handle_query_response(update: Update, context, query: str, voice_message_url: str, voice_message_language: str):
+async def handle_query_response(update: Update, context, query: str, voice_message_url: str,
+                                voice_message_language: str):
     response = await get_query_response(query, voice_message_url, voice_message_language)
     if "error" in response:
         await context.bot.send_message(chat_id=update.effective_chat.id,
-                               text='An error has been encountered. Please try again.')
+                                       text='An error has been encountered. Please try again.')
         print(response)
     else:
         answer = response['answer']
@@ -30,16 +31,15 @@ async def handle_query_response(update: Update, context, query: str, voice_messa
                 audio_request = requests.get(audio_output_url)
                 audio_data = audio_request.content
                 await context.bot.send_voice(chat_id=update.effective_chat.id,
-                                     voice=audio_data)
-
+                                             voice=audio_data)
 
 
 async def handle_reset(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     buttons = [KeyboardButton("yes"), KeyboardButton("no")]
-    button_markup = ReplyKeyboardMarkup([buttons], one_time_keyboard=True , is_persistent=True)
+    button_markup = ReplyKeyboardMarkup([buttons], one_time_keyboard=True, is_persistent=True)
 
     await context.bot.send_message(chat_id=update.effective_chat.id,
-                           text='Are you sure you want to reset the bot?', reply_markup=button_markup)
+                                   text='Are you sure you want to reset the bot?', reply_markup=button_markup)
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -53,8 +53,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
     await context.bot.send_message(chat_id=update.effective_chat.id,
-                           text=welcome_message)
-
+                                   text=welcome_message)
 
 
 async def language_handler(update: Update, context: CallbackContext):
@@ -65,8 +64,8 @@ async def language_handler(update: Update, context: CallbackContext):
     inline_keyboard_buttons = [[english_button], [hindi_button], [kannada_button]]
     reply_markup = InlineKeyboardMarkup(inline_keyboard_buttons)
 
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Choose a Language:", reply_markup=reply_markup)
-
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Choose a Language:",
+                                   reply_markup=reply_markup)
 
 
 async def handle_odr(update: Update, context: CallbackContext):
@@ -85,8 +84,7 @@ async def handle_odr(update: Update, context: CallbackContext):
     # dispute_reply_markup = KeyboardMarkup(dispute_button_rows, one_time_keyboard=True , is_persistent=True)
     dispute_reply_markup = InlineKeyboardMarkup(dispute_button_rows)
 
-
-# lang=context.user_data["language"]
+    # lang=context.user_data["language"]
     # text = prep_message(rc=redis_client,text="select_dispute_category", lang="ml")
     text = "select dispute category"
     await context.bot.send_message(chat_id=update.effective_chat.id, text=text,
@@ -110,7 +108,6 @@ async def query_handler(update: Update, context: CallbackContext):
 
     text_message = ""
 
-
     if voice_message_language == "English":
         text_message = "Thank you, allow me to search for the best information to respond to your query."
     elif voice_message_language == "Hindi":
@@ -122,20 +119,19 @@ async def query_handler(update: Update, context: CallbackContext):
     await handle_query_response(update, context, query, voice_message_url, voice_message_language)
 
 
-
-
 async def handle_select_provider_start(update: Update, context: CallbackContext):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Getting provider details")
 
+
 async def handle_select_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     buttons = [KeyboardButton("yes"), KeyboardButton("no")]
-    button_markup = ReplyKeyboardMarkup([buttons], one_time_keyboard=True , is_persistent=True)
+    button_markup = ReplyKeyboardMarkup([buttons], one_time_keyboard=True, is_persistent=True)
 
     await context.bot.send_message(chat_id=update.effective_chat.id,
-                           text='Are you sure you want to select this provider?', reply_markup=button_markup)
+                                   text='Are you sure you want to select this provider?', reply_markup=button_markup)
+
 
 async def handle_select_provider(update: Update, context: CallbackContext):
-
     await handle_select_provider_start(update, context)
     callback_query = update.callback_query
     button_data = callback_query.data
@@ -151,6 +147,7 @@ async def handle_search(update: Update, context: CallbackContext):
     button_data = callback_query.data
     category = button_data[len('search_'):]
     await connect_to_odr_providers(update, context, category)
+
 
 async def handle_language_change(update: Update, context: CallbackContext):
     callback_query = update.callback_query
@@ -168,8 +165,6 @@ async def handle_language_change(update: Update, context: CallbackContext):
         text_message = "ಕನ್ನಡ ಆಯ್ಕೆ ಮಾಡಿಕೊಂಡಿದ್ದೀರಿ. \nದಯವಿಟ್ಟು ಈಗ ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ನೀಡಿ"
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text=text_message)
-
-
 
 
 async def select_provider(update: Update, provider_info: dict, context):
@@ -218,7 +213,8 @@ async def connect_to_odr_providers(update: Update, context: CallbackContext, cat
     providers_data = odr_client.search_bpp(context._user_id, category=category)
 
     if not providers_data:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="No providers found for the selected category.")
+        await context.bot.send_message(chat_id=update.effective_chat.id,
+                                       text="No providers found for the selected category.")
         return
 
     # print(json.dumps(providers_data, indent=4))
@@ -248,16 +244,26 @@ async def connect_to_odr_providers(update: Update, context: CallbackContext, cat
 
     reply_markup = InlineKeyboardMarkup([buttons])
 
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Choose a Provider:", reply_markup=reply_markup)
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Choose a Provider:",
+                                   reply_markup=reply_markup)
+
 
 async def handle_billing_form(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a message with a button that opens a the web app."""
     await update.message.reply_text(
-        "Please press the button below to choose a color via the WebApp.",
+        "Please press the button below to fill your details.",
         reply_markup=ReplyKeyboardMarkup.from_button(
             KeyboardButton(
-                text="Open the color picker!",
+                text="Open form",
                 web_app=WebAppInfo(url="https://4c0e-106-194-45-76.ngrok-free.app/"),
             )
         ),
     )
+
+
+async def handle_init_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    pass
+
+
+def save_user_data(data):
+    redis_client.set(data["user_id"], json.dumps(data))
