@@ -1,7 +1,8 @@
+import json
 import logging
 from enum import Enum, auto
 
-from telegram import Update, Bot
+from telegram import Update, Bot, ReplyKeyboardRemove
 from telegram import __version__ as TG_VER
 from telegram.ext import (
     ApplicationBuilder,
@@ -15,31 +16,7 @@ from telegram.ext import (
 
 import fsm
 from handlers import handle_start, language_handler, query_handler, handle_language_change, handle_search, handle_odr, \
-    handle_reset, handle_select_provider, handle_select_provider_start, handle_select_confirm
-
-
-class OrderDetailsState(Enum):
-    START = auto()
-    NAME = auto()
-    EMAIL = auto()
-    ADDRESS = auto()
-    CITY = auto()
-    PHONE = auto()
-
-    def __str__(self):
-        return self.name
-
-
-class OrderChatFSM(fsm.FiniteStateMachineMixin):
-    state_machine = {
-        OrderDetailsState.START: OrderDetailsState.NAME,
-        OrderDetailsState.NAME: OrderDetailsState.EMAIL,
-        OrderDetailsState.EMAIL: OrderDetailsState.ADDRESS,
-        OrderDetailsState.ADDRESS: OrderDetailsState.CITY,
-        OrderDetailsState.CITY: OrderDetailsState.PHONE,
-        OrderDetailsState.PHONE: None
-    }
-
+    handle_reset, handle_select_provider, handle_select_provider_start, handle_select_confirm, handle_billing_form
 
 
 class ChatState(Enum):
@@ -120,15 +97,15 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
         if next_state == ChatState.SELECT:
             await handle_search(self.update, self.context)
 
-    async def on_entry_SELECT(self, prev_state):
-        await handle_select_provider_start(self.update, self.context)
-
     async def on_exit_SELECT(self, next_state):
         if next_state == ChatState.SELECT_CONFIRM:
             await handle_select_provider(self.update, self.context)
 
     async def on_entry_SELECT_CONFIRM(self, prev_state):
         await handle_select_confirm(self.update, self.context)
+
+    async def on_entry_INIT(self, prev_state):
+        await handle_billing_form(self.update, self.context)
 
 
 USER_INFO = range(1)
@@ -158,6 +135,7 @@ async def start(update: Update, context: CallbackContext) -> None:
     """Send a message when the command /start is issued."""
     fsm = ChatFSM(update, context)
     state = fsm.current_state()
+    await handle_billing_form(update, context)
 
     if state == ChatState.INITIAL:
         fsm.change_state(ChatState.START)
@@ -218,6 +196,8 @@ async def response_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     elif state == ChatState.SEARCH:
         # Show the search prompt when text message is received in the same state
         await fsm.on_entry_SEARCH(prev_state=fsm.get_prev_state())
+
+
     elif state == ChatState.SELECT_CONFIRM:
         if update.message.text == "yes":
             fsm.change_state(ChatState.INIT)
@@ -225,6 +205,12 @@ async def response_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             fsm.change_state(ChatState.SEARCH)
         else:
             await update.message.reply_text("Please enter yes or no")
+
+    elif state == ChatState.INIT:
+        # Initialize the order. Ask for user details
+        pass
+
+
 
 
 async def button_callback(update: Update, context: CallbackContext):
@@ -257,7 +243,14 @@ async def button_callback(update: Update, context: CallbackContext):
             fsm.change_state(ChatState.LANGUAGE)
 
 
-# remove
+async def init_data_handler(update: Update, context: CallbackContext):
+    data = json.loads(update.effective_message.web_app_data.data)
+    await update.message.reply_html(
+        text=(
+            json.dumps(data)
+        ),
+        reply_markup=ReplyKeyboardRemove(),
+    )
 
 
 async def initialize_order(update, context):
@@ -296,6 +289,9 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.TEXT | filters.VOICE, response_handler))
 
     application.add_handler(CallbackQueryHandler(button_callback))
+
+    application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, init_data_handler))
+
 
     application.run_polling()
 

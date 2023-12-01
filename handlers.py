@@ -1,7 +1,7 @@
 import json
 
 import requests
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update , KeyboardButton , ReplyKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 from telegram.ext import CallbackContext, ContextTypes
 
 from jb import get_query_response
@@ -135,6 +135,8 @@ async def handle_select_confirm(update: Update, context: ContextTypes.DEFAULT_TY
                            text='Are you sure you want to select this provider?', reply_markup=button_markup)
 
 async def handle_select_provider(update: Update, context: CallbackContext):
+
+    await handle_select_provider_start(update, context)
     callback_query = update.callback_query
     button_data = callback_query.data
     provider_id = button_data[len('select_provider_'):]
@@ -248,3 +250,14 @@ async def connect_to_odr_providers(update: Update, context: CallbackContext, cat
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Choose a Provider:", reply_markup=reply_markup)
 
+async def handle_billing_form(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send a message with a button that opens a the web app."""
+    await update.message.reply_text(
+        "Please press the button below to choose a color via the WebApp.",
+        reply_markup=ReplyKeyboardMarkup.from_button(
+            KeyboardButton(
+                text="Open the color picker!",
+                web_app=WebAppInfo(url="https://4c0e-106-194-45-76.ngrok-free.app/"),
+            )
+        ),
+    )
