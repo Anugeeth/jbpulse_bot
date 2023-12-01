@@ -1,4 +1,6 @@
 import json
+
+import requests
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext, ContextTypes
 
@@ -25,7 +27,7 @@ async def handle_query_response(update: Update, context, query: str, voice_messa
             if audio_output_url != "":
                 audio_request = requests.get(audio_output_url)
                 audio_data = audio_request.content
-                await bot.send_voice(chat_id=update.effective_chat.id,
+                await context.bot.send_voice(chat_id=update.effective_chat.id,
                                      voice=audio_data)
 
 
@@ -54,6 +56,24 @@ async def language_handler(update: Update, context: CallbackContext):
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Choose a Language:", reply_markup=reply_markup)
 
 
+
+async def handle_odr(update: Update, context: CallbackContext):
+    text_message = "Connecting you to ODR providers."
+
+    dispute_categories = ["commercial-dispute", "e-commerce-dispute", "consumer-dispute",
+                          "family-dispute", "civil-dispute", "financial-dispute", "employment-dispute"]
+    buttons_per_row = 2
+    dispute_buttons = [InlineKeyboardButton(category, callback_data=f'search_{category}') for category in
+                       dispute_categories]
+
+    dispute_button_rows = [dispute_buttons[i:i + buttons_per_row] for i in
+                           range(0, len(dispute_buttons), buttons_per_row)]
+    dispute_reply_markup = InlineKeyboardMarkup(dispute_button_rows)
+
+    await context.bot.send_message(chat_id=update.effective_chat.id, text="Choose a Dispute Category:",
+                                   reply_markup=dispute_reply_markup)
+
+
 async def query_handler(update: Update, context: CallbackContext):
     voice_message_language = context.user_data.get('language')
     voice_message = None
@@ -71,33 +91,16 @@ async def query_handler(update: Update, context: CallbackContext):
 
     text_message = ""
 
-    keywords = ["odr", "dispute"]
-    if query and any(keyword in query.lower() for keyword in keywords):
-        text_message = "Connecting you to ODR providers."
 
-        dispute_categories = ["commercial-dispute", "e-commerce-dispute", "consumer-dispute",
-                              "family-dispute", "civil-dispute", "financial-dispute", "employment-dispute"]
-        buttons_per_row = 2
-        dispute_buttons = [InlineKeyboardButton(category, callback_data=f'search_{category}') for category in
-                           dispute_categories]
+    if voice_message_language == "English":
+        text_message = "Thank you, allow me to search for the best information to respond to your query."
+    elif voice_message_language == "Hindi":
+        text_message = "शुक्रीया। मैं आपके प्रश्न के लिए सही जानकरी ढूंढ रही हूं।"
+    elif voice_message_language == "Kannada":
+        text_message = "ಧನ್ಯವಾದ. ನಾನು ಉತ್ತಮ ಮಾಹಿತಿಯನ್ನು ಕಂಡುಕೊಳ್ಳುವವರೆಗೆ ದಯವಿಟ್ಟು ನಿರೀಕ್ಷಿಸಿ"
 
-        dispute_button_rows = [dispute_buttons[i:i + buttons_per_row] for i in
-                               range(0, len(dispute_buttons), buttons_per_row)]
-        dispute_reply_markup = InlineKeyboardMarkup(dispute_button_rows)
-
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Choose a Dispute Category:",
-                               reply_markup=dispute_reply_markup)
-
-    else:
-        if voice_message_language == "English":
-            text_message = "Thank you, allow me to search for the best information to respond to your query."
-        elif voice_message_language == "Hindi":
-            text_message = "शुक्रीया। मैं आपके प्रश्न के लिए सही जानकरी ढूंढ रही हूं।"
-        elif voice_message_language == "Kannada":
-            text_message = "ಧನ್ಯವಾದ. ನಾನು ಉತ್ತಮ ಮಾಹಿತಿಯನ್ನು ಕಂಡುಕೊಳ್ಳುವವರೆಗೆ ದಯವಿಟ್ಟು ನಿರೀಕ್ಷಿಸಿ"
-
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=text_message)
-        await handle_query_response(update, context, query, voice_message_url, voice_message_language)
+    await context.bot.send_message(chat_id=update.effective_chat.id, text=text_message)
+    await handle_query_response(update, context, query, voice_message_url, voice_message_language)
 
 
 
