@@ -2,7 +2,7 @@ from datetime import datetime
 import uuid
 import pymongo
 
-def create_transaction_record(db, user_id, transaction_id, state, category):
+def create_transaction_record(db, user_id, state, category):
     transaction_id = str(uuid.uuid4())
     timestamp = datetime.now()
 
@@ -20,6 +20,18 @@ def create_transaction_record(db, user_id, transaction_id, state, category):
 
     result = db.transactions.insert_one(record)
     return result.inserted_id
+
+
+def update_transaction(db, transaction_id, bpp_id, bpp_uri, provider_id: str, service_id:str):
+    db.transactions.update_one(
+        {"transaction_id": transaction_id},
+        {"$set": {
+            "bpp_id": bpp_id,
+            "bpp_uri": bpp_uri,
+            "provider_id": provider_id,
+            "service_id": service_id
+        }}
+    )
 
 def update_transaction_state(db, transaction_id, new_state):
     db.transactions.update_one(

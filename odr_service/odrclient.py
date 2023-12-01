@@ -100,8 +100,10 @@ class ODRApiClient:
         }
 
         select_res =  self._make_request(endpoint, payload)
+        update_transaction(self.db, transaction_id, bpp_id, bpp_uri, provider_id, service_id=item_id)
 
-        create_transaction_record()
+        return select_res
+
 
     def init_order(self, provider_id, item_id, customer_details, bpp_id, bpp_uri):
         endpoint = "init"

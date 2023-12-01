@@ -1,10 +1,12 @@
 import asyncio
-import json
+
 import logging
 from enum import Enum, auto
 
-import redis_conn
-import requests
+# from translate import translate_strings
+# from redis_conn import RedisConnection
+
+
 from telegram import Update, Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram import __version__ as TG_VER
 from telegram.ext import (
@@ -223,6 +225,23 @@ def main() -> None:
     # Modify the handlers
 
     # application.add_handler(conversation_handler)
+
+
+
+    # _strings_dict = {
+    #     "select_dispute_category": "Choose a Dispute Category:"   
+    # }
+
+    # redis_client = RedisConnection().connect()
+
+    # target_language = "ml" 
+    # translated_strings = translate_strings(redis_client, _strings_dict, target_language)
+
+    # print(translated_strings)
+
+    # redis_client = RedisConnection().close()
+
+
 
     application.run_polling()
 
