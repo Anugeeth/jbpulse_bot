@@ -22,6 +22,9 @@ odr_client = init()
 
 USER_INFO = range(1)
 
+# 6567325826:AAGKVgUk8o424z4IMnitfwLTbqbKtNN_Qjo
+# 
+
 bot = Bot(token="6567325826:AAGKVgUk8o424z4IMnitfwLTbqbKtNN_Qjo")
 
 # Connect to Redis
@@ -301,15 +304,15 @@ def main() -> None:
     application.add_handler(CommandHandler('set_language', language_handler))
 
 # remove handler when init is done
-    application.add_handler(CommandHandler("conv", initialize_order))
+    # application.add_handler(CommandHandler("conv", initialize_order))
 
-    conversation_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.TEXT, initialize_order)],
-        states={
-            USER_INFO: [MessageHandler(filters.TEXT, user_details_conv)],
-        },
-        fallbacks=[],
-    )
+    # conversation_handler = ConversationHandler(
+    #     entry_points=[MessageHandler(filters.TEXT, initialize_order)],
+    #     states={
+    #         USER_INFO: [MessageHandler(filters.TEXT, user_details_conv)],
+    #     },
+    #     fallbacks=[],
+    # )
 
 
     # Modify the handlers
@@ -318,7 +321,7 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(preferred_language_callback, pattern=r'lang_\w*'))
 
 
-    application.add_handler(conversation_handler)
+    # application.add_handler(conversation_handler)
 
 
     application.add_handler(MessageHandler(filters.TEXT | filters.VOICE, response_handler))
