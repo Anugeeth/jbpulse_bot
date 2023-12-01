@@ -2,6 +2,7 @@ import requests
 import json
 import uuid
 from datetime import datetime
+from odr_service.utils.serializer import json_serial
 from odr_service.services.users import *
 from odr_service.services.transactions import *
 
@@ -35,10 +36,8 @@ class ODRApiClient:
         headers = {'Content-Type': 'application/json'}
         response = requests.post(url, data=json.dumps(payload), headers=headers)
         if response.status_code == 200:
-            print(response.text)
             return json.loads(response.text)
         else:
-            print("error req")
             return {"error": f"Error {response.status_code}: {response.text}"}
 
 
@@ -50,7 +49,7 @@ class ODRApiClient:
         existing_transaction = get_user_state(self.db ,user_id)
 
         if existing_transaction is None:
-            create_transaction_record(self.db ,user_id, "SEARCH", category )
+            create_transaction_record(self.db ,user_id, "SEARCH", category)
         elif existing_transaction["state"] == "SEARCH":
             transaction_id = existing_transaction["transaction_id"]
 
@@ -100,7 +99,9 @@ class ODRApiClient:
             }
         }
 
-        return self._make_request(endpoint, payload)
+        select_res =  self._make_request(endpoint, payload)
+
+        create_transaction_record()
 
     def init_order(self, provider_id, item_id, customer_details, bpp_id, bpp_uri):
         endpoint = "init"

@@ -1,7 +1,7 @@
 import json
 
 import requests
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update , KeyboardButton , ReplyKeyboardMarkup
 from telegram.ext import CallbackContext, ContextTypes
 
 from jb import get_query_response
@@ -47,6 +47,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "standard/correct information. Always consult with the concerned "
         "personnel for availing relevant information."
     )
+
     await context.bot.send_message(chat_id=update.effective_chat.id,
                            text=welcome_message)
 
@@ -73,8 +74,11 @@ async def handle_odr(update: Update, context: CallbackContext):
     dispute_buttons = [InlineKeyboardButton(category, callback_data=f'search_{category}') for category in
                        dispute_categories]
 
+    # dispute_buttons = [KeyboardButton(category) for category in dispute_categories]  
+
     dispute_button_rows = [dispute_buttons[i:i + buttons_per_row] for i in
                            range(0, len(dispute_buttons), buttons_per_row)]
+    # dispute_reply_markup = KeyboardMarkup(dispute_button_rows, one_time_keyboard=True , is_persistent=True)
     dispute_reply_markup = InlineKeyboardMarkup(dispute_button_rows)
 
     await context.bot.send_message(chat_id=update.effective_chat.id, text="Choose a Dispute Category:",

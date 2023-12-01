@@ -97,7 +97,7 @@ class ChatFSM(fsm.FiniteStateMachineMixin):
 
 USER_INFO = range(1)
 
-bot = Bot(token="6476677118:AAF1SLFv_M1JEh5QhfKcst2M2Ol911Vf5vU")
+bot = Bot(token="6567325826:AAGKVgUk8o424z4IMnitfwLTbqbKtNN_Qjo")
 
 try:
     from telegram import __version_info__

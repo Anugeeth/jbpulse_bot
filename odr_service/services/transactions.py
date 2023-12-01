@@ -2,7 +2,7 @@ from datetime import datetime
 import uuid
 import pymongo
 
-def create_transaction_record(db, user_id, state,category):
+def create_transaction_record(db, user_id, transaction_id, state, category):
     transaction_id = str(uuid.uuid4())
     timestamp = datetime.now()
 
