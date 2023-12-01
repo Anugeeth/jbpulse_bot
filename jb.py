@@ -49,6 +49,7 @@ async def get_query_response(query: str, voice_message_url: str, voice_message_l
             url = 'https://api.jugalbandi.ai/query-using-voice-gpt4?' \
                   + urllib.parse.urlencode(params)
 
+        print(url)
         response = requests.get(url)
         response.raise_for_status()
         data = response.json()
